@@ -12,7 +12,7 @@
 
 <p align="center">
   <a href="https://github.com/salim-stat-ai/gis_map_dz"><img src="https://img.shields.io/badge/GitHub-salim--stat--ai%2Fgis__map__dz-181717?style=for-the-badge&logo=github" alt="GitHub Repository"></a>
-  <a href="https://gismap2.vercel.app/"><img src="https://img.shields.io/badge/Production-gismap2.vercel.app-000000?style=for-the-badge&logo=vercel" alt="Vercel Deployment"></a>
+  <a href="https://gismapdz.vercel.app/"><img src="https://img.shields.io/badge/Production-gismapdz.vercel.app-000000?style=for-the-badge&logo=vercel" alt="Vercel Deployment"></a>
   <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript" alt="TypeScript">
   <img src="https://img.shields.io/badge/React-19.0-61DAFB?style=for-the-badge&logo=react" alt="React">
   <img src="https://img.shields.io/badge/Leaflet-GIS_Core-199900?style=for-the-badge&logo=leaflet" alt="Leaflet">
@@ -295,7 +295,7 @@ The repository is fully optimized for automated zero-config deployment on [Verce
 
 * **Author & Lead Architect**: Salim Slimani ([@salim-stat-ai](https://github.com/salim-stat-ai))
 * **Repository**: [https://github.com/salim-stat-ai/gis_map_dz](https://github.com/salim-stat-ai/gis_map_dz)
-* **Production Deployment**: [https://gismap2.vercel.app/](https://gismap2.vercel.app/)
+* **Production Deployment**: [https://gismapdz.vercel.app/](https://gismapdz.vercel.app/)
 * **License**: Open-Source Decision Support Software — Apache License 2.0.
 
 *Developed for the Algerian National Foresight Initiative 2030.*

@@ -8,6 +8,9 @@
 
 **See the problem on the map, find the solution.** A web app combining **GIS** and **AI** to diagnose and forecast Algeria's economic and social challenges — from crisis response to prediction.
 
+* **Production Deployment:** [https://gismapdz.vercel.app/](https://gismapdz.vercel.app/)
+* **GitHub Repository:** [https://github.com/salim-stat-ai/gis_map_dz](https://github.com/salim-stat-ai/gis_map_dz)
+
 ## Sectors on one map
 | Sector | Layers |
 |---|---|
