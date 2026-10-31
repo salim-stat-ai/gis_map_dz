@@ -1,215 +1,301 @@
-# GIS Map – Geo-Intelligence & Quantitative Foresight for Algeria (2030)
-## نظام الذكاء الجغرافي والاستشراف الكمي الوطني – الجزائر 2030
+<p align="center">
+  <a href="https://github.com/salim-stat-ai/gis_map_dz">
+    <img src="assets/logo.svg" width="130" height="130" alt="gis_map logo" style="border-radius: 28px; filter: drop-shadow(0 8px 24px rgba(16,185,129,0.35));" />
+  </a>
+</p>
 
-[![Vercel Deployment](https://img.shields.io/badge/Vercel-gismap2.vercel.app-000000?style=for-the-badge&logo=vercel)](https://gismap2.vercel.app/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
-[![React](https://img.shields.io/badge/React-19.0-61DAFB?style=for-the-badge&logo=react)](https://react.dev/)
-[![Leaflet](https://img.shields.io/badge/Leaflet-GIS_Mapping-199900?style=for-the-badge&logo=leaflet)](https://leafletjs.com/)
-[![Express](https://img.shields.io/badge/Express-REST_APIs-000000?style=for-the-badge&logo=express)](https://expressjs.com/)
+<h1 align="center">GIS Map — Geo-Intelligence for Algeria</h1>
+<p align="center">
+  <strong>National Spatial Decision-Support & Quantitative Foresight Platform 2030</strong><br>
+  <em>AI + Spatial Econometrics (GIS) + Quantitative Algorithmic Forecasting + Multi-Agent Intelligence</em>
+</p>
 
----
-
-## 1. Overview & Vision | الرؤية العامة
-
-**GIS Map – Geo-Intelligence for Algeria** is an advanced sovereign quantitative decision-support system integrating:
-$$\text{National Foresight 2030} = \text{AI Agents} + \text{Spatial Econometrics (GIS)} + \text{Quantitative Algorithmic Forecasting} + \text{Multi-Criteria Decision Analysis}$$
-
-The platform unites all **58 Algerian Wilayas** across **5 strategic national development sectors**:
-1. **Housing & Urbanism (السكن والعمران)**
-2. **Agriculture & Food Security (الفلاحة والأمن الغذائي)**
-3. **Water Resources & Desalination (الموارد المائية وتحلية المياه)**
-4. **Commercial Supply & Regulated Markets (التجارة وضبط الأسواق)**
-5. **Industry & Strategic Investment (الصناعة وترقية الاستثمار)**
-
-All quantitative outputs are derived from **deterministic mathematical algorithms and statistical regressions**—not synthetic AI hallucinations—ensuring reproducible, auditable foresight for senior executive leadership.
+<p align="center">
+  <a href="https://github.com/salim-stat-ai/gis_map_dz"><img src="https://img.shields.io/badge/GitHub-salim--stat--ai%2Fgis__map__dz-181717?style=for-the-badge&logo=github" alt="GitHub Repository"></a>
+  <a href="https://gismap2.vercel.app/"><img src="https://img.shields.io/badge/Production-gismap2.vercel.app-000000?style=for-the-badge&logo=vercel" alt="Vercel Deployment"></a>
+  <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript" alt="TypeScript">
+  <img src="https://img.shields.io/badge/React-19.0-61DAFB?style=for-the-badge&logo=react" alt="React">
+  <img src="https://img.shields.io/badge/Leaflet-GIS_Core-199900?style=for-the-badge&logo=leaflet" alt="Leaflet">
+  <img src="https://img.shields.io/badge/Express-Backend_APIs-000000?style=for-the-badge&logo=express" alt="Express">
+</p>
 
 ---
 
-## 2. Core Architectural Pillars | الأركان المعمارية
+<p align="center">
+  <a href="https://github.com/salim-stat-ai/gis_map_dz">
+    <img src="assets/banner.svg" width="100%" alt="gis_map — Geo-Intelligence for Algeria Banner" style="border-radius: 16px; border: 1px solid #22314F;" />
+  </a>
+</p>
 
-### 2.1 Quantitative Forecasting Engine (12 Models)
-- **Time Series & Exponential Smoothing**:
-  - `ARIMA(p, d, q)` Box-Jenkins autoregressive integrated moving average with automated order differencing and drift estimation.
-  - `SARIMA(p, d, q)×(P, D, Q)_s` Seasonal autoregression with cyclical adjustment.
-  - `Holt-Winters` double exponential smoothing with additive linear trend ($L_t, T_t$).
-  - `ETS(A, A, N)` state-space exponential smoothing with Gaussian residual variance.
-- **Econometric Regression**:
-  - `Ordinary Least Squares (OLS) Linear Regression` with $t$-statistics, $F$-statistic, $R^2$, and Adjusted $R^2$.
-  - `Multiple Linear Regression` with multi-factor predictors and matrix normal equations $(X^T X)^{-1} X^T Y$.
-  - `Polynomial Degree-2 Curve` modeling non-linear acceleration and inflection points.
-  - `Ridge Regression` (Tikhonov $L_2$ regularization) for handling multicollinearity: $\hat{\beta} = (X^T X + \lambda I)^{-1} X^T Y$.
-  - `Lasso Regression` ($L_1$ regularization via coordinate descent and soft-thresholding) for sparse feature selection: $\mathcal{S}(z, \lambda) = \text{sign}(z)\max(0, |z|-\lambda)$.
-- **Machine Learning & Ensemble Methods**:
-  - `Random Forest Ensemble Regressor` with $B=50$ bootstrapped decision trees and randomized split evaluation.
-  - `XGBoost / Gradient Boosted Decision Trees` with sequential pseudo-residual shrinkage ($\eta = 0.1$) and split depth control.
-- **Probabilistic & Stochastic Simulation**:
-  - `Monte Carlo Simulation` ($N = 1,500$ stochastic iterations) with drift velocity, volatility $\sigma$, and empirical 80%/95% confidence intervals.
-- **Rigorous Model Evaluation**:
-  - Walk-Forward Cross-Validation (Rolling Out-Of-Sample backtesting).
-  - Out-Of-Sample RMSE, MAE, MAPE, AIC, and BIC tournament ranking.
+> **"From crisis response → to quantitative forecasting 2030.**  
+> Every socio-economic challenge in Algeria has an address on the ground. `gis_map` layers real estate, soil, rainfall, dams, and factories with mathematical rigor."
+
+---
+
+## 1. Executive Summary & Vision
+
+**GIS Map – Geo-Intelligence for Algeria** is an enterprise-grade sovereign decision-support platform engineered to transform raw geospatial data, multi-sector time-series, and environmental observations into auditable 2030 strategic forecasts.
+
+$$\mathbf{\text{National Foresight 2030}} = \mathbf{\text{AI Agents}} + \mathbf{\text{Spatial Econometrics (GIS)}} + \mathbf{\text{Deterministic Forecasting Engine}} + \mathbf{\text{Multi-Criteria Governance}}$$
+
+Unlike superficial conversational bots, all quantitative findings within `gis_map` originate from **rigorous mathematical and statistical computing engines** executed in real time across all **58 Algerian Wilayas** spanning **5 strategic national development pillars**:
+
+1. **Housing & Urban Planning (السكن والعمران):** Land availability, $/m^2$ price trends, flood plain hazard zones, and safe urban expansion corridors.
+2. **Agriculture & Food Security (الفلاحة والأمن الغذائي):** Soil quality indices, satellite NDVI vegetation health, annual rainfall, and cereal vulnerability.
+3. **Water Resources & Desalination (الموارد المائية وتحلية المياه):** Dam fill capacities, deep aquifer boreholes, desalinated water pipeline integration, and chronic deficits ($m^3$).
+4. **Commercial Supply & Regulated Markets (التجارة وضبط الأسواق):** Wholesale distribution depots, cold-chain storage coverage, and price volatility monitoring.
+5. **Industry & Strategic Investment (الصناعة وترقية الاستثمار):** High-voltage electrical power grids, logistics corridors, national highway connectivity, and skilled industrial workforce availability.
+
+---
+
+## 2. Core Architectural Engines
+
+### 2.1 Quantitative Forecasting Engine (12 Algorithmic Models)
+Deterministic, auditable computational forecasting with out-of-sample backtesting:
+
+* **Time Series & Exponential Smoothing**:
+  * **ARIMA(p, d, q)**: Box-Jenkins autoregressive integrated moving average with automated AIC-minimizing order selection and drift estimation.
+  * **SARIMA(p, d, q)×(P, D, Q)$_s$**: Multiplicative seasonal autoregression capturing annual agro-climatic and macroeconomic cycles.
+  * **Holt's Linear Exponential Smoothing**: Double exponential filtering modeling level ($L_t$) and additive slope trend ($T_t$).
+  * **ETS(A, A, N)**: State-space formulation providing exact mathematical variance decomposition.
+* **Econometric Regressions**:
+  * **Ordinary Least Squares (OLS) Linear Regression**: Full ANOVA decomposition, $t$-statistics, $F$-statistic, $R^2$, and Adjusted $R^2$.
+  * **Multiple Linear Regression**: Multi-variable matrix solver $(X^T X)^{-1} X^T Y$ quantifying inter-indicator elasticity.
+  * **Polynomial Degree-2 Curve**: Quadratic trajectory tracking acceleration, plateauing, and critical inflection points.
+  * **Ridge Regression (Tikhonov $L_2$)**: Shrinkage estimator $\hat{\beta} = (X^T X + \lambda I)^{-1} X^T Y$ resolving multi-collinearity among infrastructure variables.
+  * **Lasso Regression ($L_1$)**: Sparse feature selection via coordinate descent with soft-thresholding operator $\mathcal{S}(z, \lambda)$.
+* **Machine Learning & Ensemble Regressors**:
+  * **Random Forest Ensemble**: Bagged forest ($B=50$ bootstrapped trees) with randomized feature subsets at each split node.
+  * **XGBoost / Gradient Boosted Trees**: Sequential pseudo-residual shrinkage with learning rate $\eta = 0.1$ and loss reduction controls.
+* **Probabilistic Risk & Stress-Testing**:
+  * **Monte Carlo Stochastic Simulation ($N = 1,500$ runs)**: Geometric Brownian motion with drift parameter $\mu$ and volatility $\sigma$, generating empirical 80% and 95% confidence intervals.
+* **Model Tournament & Walk-Forward Validation**:
+  * Rolling Out-Of-Sample backtesting evaluating RMSE, MAE, MAPE, AIC, and BIC to rank and pick the champion model automatically.
+
+---
 
 ### 2.2 Advanced GIS Spatial Engine
-- **Spatial Autocorrelation**: Global **Moran's I** statistic with distance inverse-weight matrix $W_{ij} = \frac{1}{d_{ij}^\alpha}$ and standardized $Z$-score test against spatial randomness.
-- **Hotspot Analysis**: **Getis-Ord $G_i^*$** local spatial clustering identifying statistically significant hotspots (90%, 95%, 99% confidence) and coldspots.
-- **Spatial Econometric Regression**: **Spatial Autoregressive Model (SAR / Spatial Lag)**:
-  $$Y = \rho W Y + X \beta + \epsilon$$
-  quantifying regional spatial spillover coefficients ($\rho$) across neighboring Algerian territories.
-- **Continuous Density & Surface Modeling**:
-  - **2D Kernel Density Estimation (KDE)** using bivariate quartic kernels with Silvermans rule bandwidth selection.
-  - **Ordinary Kriging Spatial Interpolation** with spherical semivariogram modeling $\gamma(h) = c_0 + c \left[ 1.5 \frac{h}{a} - 0.5 \left(\frac{h}{a}\right)^3 \right]$ for unmonitored rural communes.
-- **Multi-Criteria Evaluation**: **Analytic Hierarchy Process (AHP)** with pairwise comparison matrix and consistency verification ($CR < 0.10$).
-- **Territorial Hierarchy**: Regional aggregation across the 5 national territorial divisions: *North Coastal, High Plateaus, East, West, and Great South*.
+Spatial statistics and spatial econometrics providing territorial intelligence:
 
-### 2.3 Multi-Format Data Ingestion Pipeline
-- **Formats Supported**: `CSV`, `Excel (.xlsx, .xls)`, `GeoJSON`, `KML`, `Shapefile (.shp / .zip)`, and `SQLite (.db, .sqlite)`.
-- **Automated Validation Protocols**:
-  - Algerian bounding box coordinate check: $\text{Latitude} \in [18.5, 37.5]^\circ\text{N}$, $\text{Longitude} \in [-9.0, 12.5]^\circ\text{E}$.
-  - Data unit standardization and currency normalization (DZD, Millions, Quintals, $m^3$).
-  - Missing value imputation via linear temporal interpolation and $k$-NN spatial neighbor estimation.
-  - Automated duplicate record pruning and schema conformance checks.
-  - Immutable audit trail recording every applied data transformation.
+* **Global Spatial Autocorrelation (Moran's I)**:
+  $$I = \frac{n}{S_0} \frac{\sum_{i=1}^n \sum_{j=1}^n w_{ij}(x_i - \bar{x})(x_j - \bar{x})}{\sum_{i=1}^n (x_i - \bar{x})^2}$$
+  Standardized $Z$-score testing identifying whether economic phenomena are clustered, dispersed, or random.
+* **Hotspot Analysis (Getis-Ord $G_i^*$)**:
+  Local spatial clustering identifying statistically significant hotspots (90%, 95%, 99% confidence) and coldspots for water stress, agricultural deficits, and price surges.
+* **Spatial Econometric Regression (Spatial Lag / SAR)**:
+  $$Y = \rho W Y + X \beta + \epsilon$$
+  Estimating spatial spillover coefficients ($\rho$) to evaluate how neighboring wilayas influence local indicators.
+* **Spatial Interpolation & Continuous Surface Modeling**:
+  * **2D Kernel Density Estimation (KDE)**: Bivariate quartic kernels mapping continuous hazard zones.
+  * **Ordinary Kriging**: Best Linear Unbiased Estimator (BLUE) with spherical semivariogram modeling:
+    $$\gamma(h) = c_0 + c \left[ 1.5 \left(\frac{h}{a}\right) - 0.5 \left(\frac{h}{a}\right)^3 \right]$$
+* **Analytic Hierarchy Process (AHP)**: Multi-criteria decision analysis prioritizing industrial and agricultural suitability with consistency ratio validation ($CR < 0.10$).
+* **Basemap Switcher (Free / No Key Required)**:
+  * OpenStreetMap Standard (OSM)
+  * Esri High-Resolution Satellite Imagery
+  * Esri Dark Canvas
+  * OpenTopoMap Topographic Relief
+
+---
+
+### 2.3 Multi-Format Data Ingestion & Processing Pipeline
+Seamless feeding of the live map and models from local files or remote data portals:
+
+* **Supported Input Formats**:
+  * Spreadsheets: `CSV`, `TSV`, `TXT`, `Excel (.xlsx, .xls)`.
+  * Spatial Formats: `GeoJSON`, `KML`, zipped `Shapefiles (.zip with .shp + .dbf)`.
+  * Relational Databases: `SQLite (.db, .sqlite, .sqlite3)`.
+* **18 Standard Indicator Column Auto-Mapping**:
+  Automatically recognizes column aliases and binds them to the national indicator schema:
+  1. Wilaya name (`name`) | 2. Latitude (`lat`) | 3. Longitude (`lon`)
+  4. Population (`pop`) | 5. Price/m² (`price`) | 6. Flood risk (`flood`)
+  7. Soil quality (`soil`) | 8. Rainfall (`rain`) | 9. NDVI vegetation (`ndvi`)
+  10. Dams (`dams`) | 11. Wells (`wells`) | 12. Water deficit (`waterDef`)
+  13. Markets (`markets`) | 14. Retail coverage (`coverage`) | 15. Energy grid (`energy`)
+  16. Road connectivity (`roads`) | 17. Labor force (`labor`) | 18. Industrial capacity (`industry`)
+* **Built-in Global & National Data Sources**:
+  * **GADM**: Official administrative polygon boundaries for Algeria.
+  * **OpenStreetMap Overpass API**: Live extraction of dams, reservoirs, and healthcare facilities.
+  * **World Bank REST API**: Algeria time-series indicators (population, macro trends).
+  * **NASA POWER API**: Climatological rainfall and solar irradiance.
+  * **ONS & ANRH**: Built-in sample datasets (`wilaya_indicators.csv`, `dams.geojson`).
+* **CORS Proxy Route**: Native server proxy (`/api/proxy?url=...`) bypassing cross-origin restrictions.
+* **Multi-Format Dataset Export**:
+  Export live datasets and 2030 forecasted values to `CSV (UTF-8 BOM)`, `Excel (.xlsx)`, `GeoJSON`, `KML`, and `JSON`.
+
+---
 
 ### 2.4 Seven Specialized AI Agents
-1. **Muse Spark** – Lead Qualitative Synthesizer & Strategic Policy Advisor.
-2. **Gemini Pro (Google)** – Deep Multimodal Data Miner & Econometric Analyst.
-3. **ChatGPT (OpenAI)** – Scenario Simulation & Decision Tree Evaluator.
-4. **Qwen (Alibaba)** – Industrial Capacity, Trade Logistics & Infrastructure Expert.
-5. **DeepSeek (DeepSeek)** – Mathematical Verification, Algorithmic Auditor & Spatial Econometrician.
-6. **Claude (Anthropic)** – Ethical Governance, Institutional Risk & Sustainability Overseer.
-7. **Grok (xAI)** – Real-time Early Warning, Geopolitical Volatility & Stress Tester.
+Seven specialized personas running quantitative rules and localized heuristics:
+
+1. **Muse Spark** — Lead Policy Synthesizer & Strategic Directives Author.
+2. **Gemini Pro (Google)** — Deep Multimodal Analyst & Macroeconomic Trend Miner.
+3. **ChatGPT (OpenAI)** — Scenario Simulation & Decision Tree Evaluator.
+4. **Qwen (Alibaba)** — Industrial Supply Chain, Port Logistics & Highway Expert.
+5. **DeepSeek (DeepSeek)** — Mathematical Auditor & Spatial Econometric Validator.
+6. **Claude (Anthropic)** — Institutional Risk, Water Ethics & Sustainability Overseer.
+7. **Grok (xAI)** — Real-time Emergency Radar, Inflation & Geopolitical Stress Tester.
+
+---
 
 ### 2.5 12-Step Sovereign AI Council Chamber
-Simulates an executive cabinet session across 12 rigorous procedural phases:
-1. Session Initialization & Quorum Verification
-2. Mathematical Proof Audit & Discrepancy Scanning
-3. Spatial Spillover & Inter-Wilaya Diffusion Analysis
-4. Quantitative Baseline vs. Target Variance Check
-5. Cross-Sector Risk Propagation Assessment
-6. Multi-Model Consensus Tournament Review
-7. Divergence Flagging & Minority Opinion Recording
-8. Scenario Sensitivity & Extreme Stress-Testing
-9. Strategic Trade-off & Budgetary Allocation Optimization
-10. Synthesis of Executive Decision Points
-11. Formal Vote & Multi-Agent Consensus Scoring
-12. Sovereign Roadmap Publication & Actionable Directives
+Simulates an executive cabinet deliberation across 12 structured procedural milestones:
+
+```
+[01. Quorum Verification] ──► [02. Math Proof Audit] ──► [03. Spatial Spillover Analysis]
+                                                                     │
+[06. Tournament Review]   ◄── [05. Cross-Sector Risk] ◄── [04. Baseline vs Target Variance]
+       │
+[07. Divergence Flagging] ──► [08. Extreme Stress-Test] ──► [09. Budgetary Optimization]
+                                                                     │
+[12. Sovereign Roadmap]   ◄── [11. Consensus Vote]     ◄── [10. Executive Decision Points]
+```
+
+---
 
 ### 2.6 Multi-Hazard National Early Warning System
-- **Real-Time Threshold Scanning**:
-  - **Water Stress & Drought**: Dam filling rate $< 25\%$ and groundwater deficit $> -30\%$.
-  - **Flash Flood Risk**: Steep watershed slopes and extreme precipitation runoffs.
-  - **Commercial Supply Gaps**: Huff gravity retail coverage deficits exceeding $30\%$.
-  - **Price Volatility & Speculation**: Regional variance in staple goods distribution.
-- **Protocol Automation**: Specific, actionable emergency civil protection and inter-ministerial interventions with uncertainty bounds.
-
-### 2.7 Sovereign Decision Reporting
-- Executive A4 Print Layout with high-density statistical typography.
-- Standalone HTML interactive executive brief download.
-- Full CSV dataset export for ministerial ERP and GIS integration.
+Automated continuous rule-based scanning detecting critical flashpoints:
+* **Water Emergency**: Wilayas exhibiting severe deficits ($< -25\text{ m}^3$) and dam depletion below 20%.
+* **Flash Flood Vulnerability**: Steep topography combined with saturated rainfall projections ($> 0.20$ risk).
+* **Supply Chain Breakdown**: Commercial market coverage deficits exceeding 35%.
+* **Price Shocks**: Anomalous real estate and agricultural price deviations exceeding $+2.5\sigma$.
 
 ---
 
-## 3. Directory Structure | هيكل المجلدات
+### 2.7 Sovereign Decision Reporting Engine
+* **A4 Formal Executive Print Layout**: High-density statistical styling optimized for physical printouts and ministerial submissions.
+* **Three Report Modalities**: Combined 2030 Dossier, Legacy 7-Section Diagnostic, or 2030 Quantitative Foresight.
+* **Interactive Standalone HTML Export**: Self-contained report file with embedded charts and CSS.
+* **Standardized CSV Export**: Exporting full indicators and predictions.
+
+---
+
+## 3. Repository & Directory Structure
 
 ```
+gis_map_dz/
+├── assets/
+│   ├── logo.svg                         # Official emblem with hexagon & location pin
+│   └── banner.svg                       # Full-width 1200x420 hero banner with 2030 slogan
 ├── public/
-│   ├── assets/
-│   │   ├── logo.svg
-│   │   └── banner.svg
+│   ├── assets/                          # Static assets served by web app
 │   └── samples/
-│       ├── wilaya_indicators.csv
-│       ├── dams.geojson
-│       └── agricultural_zones.json
+│       ├── wilaya_indicators.csv        # 18-indicator verified national benchmark dataset
+│       └── dams.geojson                 # Spatial points for major Algerian reservoirs
 ├── src/
 │   ├── components/
-│   │   ├── Header.tsx                   # Bilingual header, sector/wilaya picker
-│   │   ├── NavigationTabs.tsx           # Tab routing with real-time badges
-│   │   ├── GisMapSection.tsx            # Leaflet interactive map with custom layers
-│   │   ├── QuantitativeCenter.tsx       # 12-model forecasting lab & tournament
-│   │   ├── SpatialAnalysisLab.tsx       # Moran's I, Gi*, SAR regression, Kriging, KDE
-│   │   ├── ScenarioCenter.tsx           # Optimistic / Baseline / Pessimistic to 2035
-│   │   ├── AgentsCenter.tsx             # 7 AI Agents with mathematical reasoning
+│   │   ├── Header.tsx                   # Top navigation bar, language toggle (EN / AR)
+│   │   ├── NavigationTabs.tsx           # 9 analytical module tabs with alert badges
+│   │   ├── GisMapSection.tsx            # Leaflet map, 4 basemaps, radar & forecast charts
+│   │   ├── QuantitativeCenter.tsx       # 12-model forecasting laboratory & tournament
+│   │   ├── SpatialAnalysisLab.tsx       # Moran's I, Getis-Ord Gi*, SAR lag, Kriging, KDE
+│   │   ├── ScenarioCenter.tsx           # Optimistic / Baseline / Pessimistic pathways to 2035
+│   │   ├── AgentsCenter.tsx             # 7 AI Agent analysis with live OpenRouter toggle
 │   │   ├── CouncilChamber.tsx           # 12-step AI Council consensus chamber
-│   │   ├── EarlyWarningDashboard.tsx    # Live multi-hazard emergency radar
-│   │   ├── Foresight2030Dashboard.tsx   # 5-sector national territorial observatory
-│   │   ├── DataImportStudio.tsx         # Multi-format ingestion pipeline & audit
-│   │   └── ReportModal.tsx              # Sovereign A4 report, HTML, CSV exports
+│   │   ├── EarlyWarningDashboard.tsx    # Multi-hazard national crisis radar
+│   │   ├── Foresight2030Dashboard.tsx   # Strategic 2030 national foresight observatory
+│   │   ├── DataImportStudio.tsx         # Multi-format data ingestion, mapping & export
+│   │   └── ReportModal.tsx              # Executive A4 report generator & file exporter
 │   ├── engines/
-│   │   ├── quantitative.ts              # Mathematical algorithms & econometric models
+│   │   ├── quantitative.ts              # 12 algorithmic forecasting models
 │   │   ├── gis.ts                       # Spatial statistics, SAR, Kriging, KDE, AHP
-│   │   ├── dataRegistry.ts             # 58 Wilayas multitemporal historical series
-│   │   ├── ingestion.ts                 # Validation, coordinate checks, transformations
-│   │   ├── scenario.ts                  # 3-pathway driver projection engine
-│   │   ├── evaluation.ts                # Out-of-sample backtesting & tournament
-│   │   ├── agents.ts                    # 7 Agent analytical personas & prompts
-│   │   ├── council.ts                   # 12-step consensus synthesis engine
-│   │   ├── earlyWarning.ts              # Multi-hazard rule engine & thresholds
+│   │   ├── dataRegistry.ts             # 58 Algerian wilayas historical dataset
+│   │   ├── dataImportEngine.ts          # Parsers, auto-mapping aliases, exporters (CSV/XLSX/KML/GeoJSON)
+│   │   ├── ingestion.ts                 # Audit logging and coordinate bounds sanitizer
+│   │   ├── scenario.ts                  # Macroeconomic pathway generator
+│   │   ├── evaluation.ts                # Out-of-sample backtesting & tournament metrics
+│   │   ├── agents.ts                    # 7 AI agent personas and analytical workflows
+│   │   ├── council.ts                   # 12-step consensus resolution engine
+│   │   ├── earlyWarning.ts              # Multi-hazard threshold scanner
 │   │   └── reporting.ts                 # Bilingual strategic report generator
 │   ├── types/
-│   │   └── index.ts                     # TypeScript interfaces & types
-│   ├── App.tsx                          # Root application orchestrator
-│   ├── index.css                        # Tailwind CSS v4 + Leaflet & Print styles
-│   └── main.tsx                         # React entrypoint
-├── server.ts                            # Full-stack Express API backend + Vite middleware
-├── index.html                           # HTML shell with Cairo / Inter typography
-├── metadata.json                        # Applet metadata
-├── package.json                         # Dependencies & npm scripts
-└── tsconfig.json                        # TypeScript configuration
+│   │   └── index.ts                     # TypeScript interfaces and data contracts
+│   ├── App.tsx                          # Main application orchestrator
+│   ├── index.css                        # Tailwind CSS v4 + Leaflet styling
+│   └── main.tsx                         # React entry point
+├── server.ts                            # Full-stack Express server + Vite middlewares + /api/proxy
+├── index.html                           # HTML shell with typography and SEO metadata
+├── metadata.json                        # Applet metadata & server capabilities
+├── package.json                         # Dependencies and build scripts
+└── tsconfig.json                        # TypeScript compiler configuration
 ```
 
 ---
 
-## 4. REST API Reference | واجهات برمجة التطبيقات
+## 4. REST API Specification
 
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/wilayas` | `GET` | Returns 58 Algerian wilayas with multi-temporal sector metrics |
-| `/api/models` | `GET` | Lists all 12 quantitative models and classifications |
-| `/api/data/sources` | `GET` | Catalogs all official data sources (ONS, ANRH, ONM, etc.) |
-| `/api/forecast` | `POST` | Executes algorithmic forecast on input series with confidence bands |
-| `/api/evaluate` | `POST` | Conducts walk-forward out-of-sample validation & tournament |
-| `/api/spatial/analyze` | `POST` | Computes Moran's I, Getis-Ord Gi*, and AHP suitability rankings |
-| `/api/scenarios/run` | `POST` | Generates Optimistic, Baseline, and Pessimistic pathways to 2035 |
-| `/api/early-warning` | `GET` | Scans all wilayas for active multi-hazard alerts |
-| `/api/agents/analyze` | `POST` | Dispatches query to one of the 7 specialized AI agents |
-| `/api/council/convene` | `POST` | Convenes the 12-step AI Council deliberation session |
+| Endpoint | Method | Parameters | Description |
+|---|---|---|---|
+| `/api/proxy` | `GET` | `url` | Server-side CORS proxy for external geo-data portals (GADM, OSM, NASA, World Bank) |
+| `/api/wilayas` | `GET` | — | Returns the complete 58-wilaya registry with historical time-series |
+| `/api/models` | `GET` | — | Catalogs all 12 mathematical forecasting algorithms |
+| `/api/data/sources` | `GET` | — | Lists national data registries (ONS, ANRH, ONM, DSA, ASAL) |
+| `/api/forecast` | `POST` | `model, wilayaNum, metric, years, values` | Computes forecasts with 80% & 95% confidence intervals |
+| `/api/evaluate` | `POST` | `wilayaNum, years, values` | Executes rolling backtesting tournament across all models |
+| `/api/spatial/analyze` | `POST` | `indicator, ahpCriteria` | Computes Moran's I, Getis-Ord hotspots, and AHP suitability |
+| `/api/scenarios/run` | `POST` | `wilayaNum, customDrivers` | Simulates Optimistic, Baseline, and Pessimistic pathways |
+| `/api/early-warning` | `GET` | `year, lang` | Scans national multi-hazard thresholds across all wilayas |
+| `/api/agents/analyze` | `POST` | `agentId, wilayaNum, targetYear, lang` | Queries specialized AI agent for tailored diagnosis |
+| `/api/council/convene` | `POST` | `wilayaNum, targetYear, lang` | Convenes the 12-step AI Council and generates the consensus dossier |
 
 ---
 
-## 5. Development & Deployment | التشغيل والنشر
+## 5. Getting Started & Installation
 
-### Local Development
+### Prerequisites
+* **Node.js** >= 18.0.0
+* **npm** >= 9.0.0 (or **bun** / **yarn** / **pnpm**)
+
+### Quick Start
 ```bash
-# 1. Install dependencies
+# 1. Clone the repository
+git clone https://github.com/salim-stat-ai/gis_map_dz.git
+cd gis_map_dz
+
+# 2. Install dependencies
 npm install
 
-# 2. Start full-stack development server (Express + Vite on Port 3000)
+# 3. Start the development server (runs full-stack Express + Vite on port 3000)
 npm run dev
 ```
 
-### Production Build
+Open your browser at `http://localhost:3000`.
+
+### Production Build & Deployment
 ```bash
-# Compile and package production bundle
+# Compile and build the production client bundle
 npm run build
 
-# Start production server
+# Start the production full-stack server
 npm start
 ```
 
-### Deploying to Vercel
-The repository is optimized for zero-config Vercel deployment:
-- Client-side TypeScript analytical engines execute instantaneously in the browser.
-- Full compliance with `gismap2.vercel.app` structure and styling.
-- Responsive design tailored for desktops, mobile tablets, and executive command room monitors.
+### Vercel Zero-Config Deployment
+The repository is fully optimized for automated zero-config deployment on [Vercel](https://vercel.com/):
+1. Connect your GitHub repository `https://github.com/salim-stat-ai/gis_map_dz`.
+2. Framework preset: **Vite**.
+3. Build command: `npm run build`.
+4. Output directory: `dist`.
 
 ---
 
-## 6. Official Data Source Attribution | مصادر البيانات المعتمدة
-- **ONS**: Office National des Statistiques (الديوان الوطني للإحصائيات)
-- **ANRH**: Agence Nationale des Ressources Hydrauliques (الوكالة الوطنية للموارد المائية)
-- **ONM**: Office National de la Météorologie (الديوان الوطني للأرصاد الجوية)
-- **MADR / DSA**: Direction des Services Agricoles (المصالح الفلاحية)
-- **Copernicus / Sentinel-2**: Satellite Remote Sensing (الاستشعار عن بعد)
-- **Bank of Algeria**: Financial & Inflation Indicators (بنك الجزائر)
+## 6. Official Data Source Attribution
+
+* **ONS (Office National des Statistiques)**: National demographic census, consumer price index, and labor workforce statistics.
+* **ANRH (Agence Nationale des Ressources Hydrauliques)**: National dam storage, groundwater extraction, and hydrologic stress metrics.
+* **ONM (Office National de la Météorologie)**: Official meteorological stations and historical rainfall observations.
+* **MADR / DSA (Ministère de l'Agriculture et du Développement Rural)**: Agricultural land zoning, crop yields, and agrarian infrastructure.
+* **Copernicus / Sentinel-2 (ESA)**: High-resolution satellite remote sensing and NDVI vegetative density.
+* **GADM**: Database of Global Administrative Areas (Algerian Wilaya boundaries).
+* **OpenStreetMap (OSM)**: Open geodata for hydraulic infrastructure, reservoirs, and public amenities.
 
 ---
-*Developed for the Algerian National Foresight Initiative 2030 – Salim Slimani.*
+
+## 7. License & Credits
+
+* **Author & Lead Architect**: Salim Slimani ([@salim-stat-ai](https://github.com/salim-stat-ai))
+* **Repository**: [https://github.com/salim-stat-ai/gis_map_dz](https://github.com/salim-stat-ai/gis_map_dz)
+* **Production Deployment**: [https://gismap2.vercel.app/](https://gismap2.vercel.app/)
+* **License**: Open-Source Decision Support Software — Apache License 2.0.
+
+*Developed for the Algerian National Foresight Initiative 2030.*

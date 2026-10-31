@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" width="100%" height="100%" role="img" aria-label="gis_map banner">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#062B26"/>
+      <stop offset="0.48" stop-color="#0B3B66"/>
+      <stop offset="1" stop-color="#0B1220"/>
+    </linearGradient>
+    <linearGradient id="em" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#10B981"/>
+      <stop offset="1" stop-color="#0EA5E9"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="6" stdDeviation="12" flood-color="#10B981" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Background Base -->
+  <rect width="1200" height="420" rx="16" fill="url(#bg)"/>
+  <rect width="1198" height="418" x="1" y="1" rx="15" fill="none" stroke="#22314F" stroke-width="2"/>
+
+  <!-- Ambient Glow Circles -->
+  <circle cx="1060" cy="80" r="220" fill="#10B981" opacity="0.07"/>
+  <circle cx="100" cy="350" r="180" fill="#0EA5E9" opacity="0.09"/>
+  <circle cx="650" cy="20" r="140" fill="#10B981" opacity="0.05"/>
+
+  <!-- Logo Badge on Left -->
+  <g transform="translate(64,68)" filter="url(#shadow)">
+    <rect width="144" height="144" rx="32" fill="#0B1220" stroke="#10B981" stroke-width="3" opacity="0.95"/>
+    <!-- Outer hexagon -->
+    <path d="M72 18 L118 43 V99 L72 125 L26 99 V43 Z" fill="none" stroke="url(#em)" stroke-width="7" stroke-linejoin="round"/>
+    <!-- Map pin -->
+    <path d="M72 50 c-13.5 0 -22 9.5 -22 20 0 15 22 38 22 38 s22 -23 22 -38 c0 -10.5 -8.5 -20 -22 -20 z" fill="#F59E0B"/>
+    <circle cx="72" cy="70" r="8" fill="#0B1220"/>
+  </g>
+
+  <!-- Brand Title -->
+  <text x="240" y="132" font-family="'Sora', 'Inter', 'Segoe UI', Arial, sans-serif" font-size="58" font-weight="800" fill="#FFFFFF" letter-spacing="0.3">
+    gis_map <tspan font-size="48">🗺️</tspan> <tspan font-weight="400" fill="#9AA9C7">—</tspan>
+  </text>
+  <text x="242" y="190" font-family="'Sora', 'Inter', 'Segoe UI', Arial, sans-serif" font-size="46" font-weight="700" fill="#FFFFFF">
+    Geo-Intelligence for Algeria
+  </text>
+
+  <!-- Pill & Sector Categories -->
+  <g transform="translate(242, 216)">
+    <rect width="144" height="36" rx="18" fill="url(#em)"/>
+    <text x="72" y="25" text-anchor="middle" font-family="'Inter', 'Segoe UI', Arial, sans-serif" font-size="20" font-weight="800" fill="#06281F">
+      GIS + AI
+    </text>
+    <text x="164" y="25" font-family="'Inter', 'Segoe UI', Arial, sans-serif" font-size="21" fill="#9AA9C7">
+      Housing  •  Farming  •  Water  •  Retail  •  Industry
+    </text>
+  </g>
+
+  <!-- Motto & Slogan Requested by User -->
+  <!-- Line 1: Highlighted Headline -->
+  <text x="242" y="302" font-family="'Inter', 'Segoe UI', Arial, sans-serif" font-size="22" font-weight="700" fill="#34D399" letter-spacing="0.2">
+    From crisis response → to quantitative forecasting 2030.
+  </text>
+
+  <!-- Line 2: Ground Address -->
+  <text x="242" y="338" font-family="'Inter', 'Segoe UI', Arial, sans-serif" font-size="19.5" font-weight="500" fill="#E2E8F0">
+    Every socio-economic challenge in Algeria has an address on the ground.
+  </text>
+
+  <!-- Line 3: Scientific Rigor -->
+  <text x="242" y="372" font-family="'Inter', 'Segoe UI', Arial, sans-serif" font-size="18.5" font-weight="400" fill="#9AA9C7">
+    gis_map layers real estate, soil, rainfall, dams, and factories with mathematical rigor.
+  </text>
+</svg>
