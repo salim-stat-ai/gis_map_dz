@@ -1,0 +1,6 @@
+{
+  "name": "GIS Map – Geo-Intelligence for Algeria",
+  "description": "National platform integrating AI, GIS, quantitative forecasting, spatial econometric models, multi-agent intelligence, and strategic foresight 2030 for Algeria.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

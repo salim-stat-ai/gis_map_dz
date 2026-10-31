@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" role="img" aria-label="gis_map banner">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#062B26"/>
+      <stop offset="0.55" stop-color="#0B3B66"/>
+      <stop offset="1" stop-color="#0B1220"/>
+    </linearGradient>
+    <linearGradient id="em" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#10B981"/>
+      <stop offset="1" stop-color="#0EA5E9"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="400" fill="url(#bg)"/>
+  <circle cx="1050" cy="60" r="180" fill="#10B981" opacity="0.08"/>
+  <circle cx="120" cy="340" r="150" fill="#0EA5E9" opacity="0.10"/>
+  <!-- mini logo -->
+  <g transform="translate(70,110)">
+    <rect width="140" height="140" rx="32" fill="#0B1220" stroke="#10B981" stroke-width="3" opacity="0.95"/>
+    <path d="M70 18 L114 42 V96 L70 120 L26 96 V42 Z" fill="none" stroke="url(#em)" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M70 50 c-13 0 -21 9 -21 19 0 14 21 36 21 36 s21 -22 21 -36 c0 -10 -8 -19 -21 -19 z" fill="#F59E0B"/>
+    <circle cx="70" cy="69" r="7.5" fill="#0B1220"/>
+  </g>
+  <text x="240" y="175" font-family="Segoe UI, Arial, sans-serif" font-size="64" font-weight="800" fill="#FFFFFF">gis_map <tspan font-size="52">🗺️</tspan> <tspan font-weight="400" fill="#9AA9C7">—</tspan></text>
+  <text x="242" y="235" font-family="Segoe UI, Arial, sans-serif" font-size="52" font-weight="700" fill="#FFFFFF">Geo-Intelligence for Algeria</text>
+  <rect x="242" y="265" width="150" height="40" rx="20" fill="url(#em)"/>
+  <text x="267" y="293" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="800" fill="#06281F">GIS + AI</text>
+  <text x="404" y="293" font-family="Segoe UI, Arial, sans-serif" font-size="24" fill="#9AA9C7">Housing  •  Farming  •  Water  •  Retail  •  Industry</text>
+  <text x="242" y="340" font-family="Segoe UI, Arial, sans-serif" font-size="22" fill="#9AA9C7">See the problem on the map, find the solution — from crisis response to forecasting.</text>
+</svg>

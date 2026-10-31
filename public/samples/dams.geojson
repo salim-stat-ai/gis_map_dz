@@ -1,0 +1,6 @@
+{"type":"FeatureCollection","features":[
+{"type":"Feature","geometry":{"type":"Point","coordinates":[6.27,36.55]},"properties":{"name":"Beni Haroun","type":"dam","wilaya":"Mila"}},
+{"type":"Feature","geometry":{"type":"Point","coordinates":[3.60,36.35]},"properties":{"name":"Koudiat Acerdoune","type":"dam","wilaya":"Bouira"}},
+{"type":"Feature","geometry":{"type":"Point","coordinates":[2.50,36.20]},"properties":{"name":"Ghrib","type":"dam","wilaya":"Ain Defla"}},
+{"type":"Feature","geometry":{"type":"Point","coordinates":[5.90,34.80]},"properties":{"name":"Foum El Gherza","type":"dam","wilaya":"Biskra"}}
+]}

@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>gis_map — Geo-Intelligence for Algeria | GIS + AI</title>
+<meta name="description" content="gis_map: GIS + AI decision platform for Algeria. Real estate, agriculture, water, retail and industry on one map — from crisis response to forecasting.">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Sora:wght@700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+<script>
+/* gis_map boot loader: sequential loads with CDN fallbacks, so one blocked
+   CDN can never freeze the app. Heavy import libs load lazily on demand. */
+window.__GISMAP_V = '15';
+/* global error tap: records parse/runtime errors per file for the build tag */
+window.__gisLoadLog = [];
+window.addEventListener('error', function(e){
+  try{
+    var f = (e.filename || '').split('/').pop().split('?')[0] || 'page';
+    var m = (e.message || 'error').slice(0, 90);
+    window.__gisLoadLog.push(f + ' :: ' + m);
+  }catch(_){}
+}, true);
+function __gisLoadScript(url, timeoutMs){ return new Promise(function(res, rej){
+  var done = false;
+  var s = document.createElement('script'); s.src = url;
+  var timer = setTimeout(function(){ if(!done){ done = true; rej(new Error('timeout:'+url)); } }, timeoutMs || 9000);
+  s.onload = function(){ if(!done){ done = true; clearTimeout(timer); res(true); } };
+  s.onerror = function(){ if(!done){ done = true; clearTimeout(timer); rej(new Error('cdn:'+url)); } };
+  document.head.appendChild(s);
+});}
+/* Race all mirrors in parallel: first success wins; hang = failure after timeout. */
+function __gisLoadFirst(urls, timeoutMs){ return new Promise(function(resolve){
+  var settled = false, pending = urls.length;
+  if(!pending) return resolve(false);
+  urls.forEach(function(u){
+    __gisLoadScript(u, timeoutMs || 9000).then(function(){
+      if(!settled){ settled = true; resolve(true); }
+    }).catch(function(){
+      pending--;
+      if(pending <= 0 && !settled){ settled = true; resolve(false); }
+    });
+  });
+});}
+window.__gisEnsureLib = function(testFn, urls){ try{ if(testFn()) return Promise.resolve(true); }catch(e){}
+  return __gisLoadFirst(urls).then(function(ok){ try{ return ok && testFn(); }catch(e){ return false; } }); };
+/* Verified delivery: fetch source as text (no-store), check EOF marker
+   (detects truncation/corruption), then execute. Retries with fresh URLs. */
+function __gisFetchText(url, timeoutMs){ return new Promise(function(res, rej){
+  var done = false;
+  var timer = setTimeout(function(){ if(!done){ done = true; rej(new Error('timeout')); } }, timeoutMs || 15000);
+  var finish = function(ok, val){ if(!done){ done = true; clearTimeout(timer); ok ? res(val) : rej(val); } };
+  try{
+    if(!window.fetch){ finish(false, new Error('no-fetch')); return; }
+    window.fetch(url, {cache: 'no-store'}).then(function(r){
+      if(!r.ok) throw new Error('http' + r.status);
+      return r.text();
+    }).then(function(t){ finish(true, t); }).catch(function(e){ finish(false, e); });
+  }catch(e){ finish(false, e); }
+});}
+function __gisInjectVerified(name, marker){
+  var base = name + '?v=' + window.__GISMAP_V;
+  var urls = [base, base + '&t=' + Date.now(), base + '&r=' + Math.floor(Math.random() * 1e9)];
+  var attempt = function(i){
+    if(i >= urls.length) return Promise.reject(new Error('all-copies-bad'));
+    return __gisFetchText(urls[i], 15000).then(function(t){
+      if(t.indexOf(marker) === -1) throw new Error('truncated(' + t.length + 'b)');
+      var s = document.createElement('script');
+      s.textContent = t;
+      document.head.appendChild(s);
+      return true;
+    }).catch(function(){ return attempt(i + 1); });
+  };
+  return attempt(0);
+}
+window.__gisBoot = function(){
+  var leafletCDN = ['https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+    'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js'];
+  var chartCDN = ['https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js',
+    'https://unpkg.com/chart.js@4.4.1/dist/chart.umd.min.js'];
+  window.__gisEnsureLib(function(){ return !!window.L; }, leafletCDN).then(function(){
+    return window.__gisEnsureLib(function(){ return !!window.Chart; }, chartCDN);
+  }).then(function(){
+    var files = [
+      ['data.js', '/*GISMAP_EOF:data*/'],
+      ['app.js', '/*GISMAP_EOF:app*/'],
+      ['agents.js', '/*GISMAP_EOF:agents*/'],
+      ['import.js', '/*GISMAP_EOF:import*/'],
+      ['report.js', '/*GISMAP_EOF:report*/']
+    ], chain = Promise.resolve();
+    files.forEach(function(pair){ chain = chain.then(function(){
+      if(window.fetch){ return __gisInjectVerified(pair[0], pair[1]).then(function(){
+        window.__gisLoadLog.push(pair[0] + ' :: verified');
+      }).catch(function(err){
+        window.__gisLoadLog.push(pair[0] + ' :: FAILED(' + (err && err.message ? err.message.slice(0,60) : 'unknown') + ')');
+      }); }
+      return __gisLoadScript(pair[0] + '?v=' + window.__GISMAP_V, 15000).then(function(){
+        window.__gisLoadLog.push(pair[0] + ' :: loaded');
+      }).catch(function(err){
+        window.__gisLoadLog.push(pair[0] + ' :: FAILED(' + (err && err.message ? err.message.slice(0,60) : 'unknown') + ')');
+      });
+    }); });
+    return chain;
+  }).then(function(){
+    try{ if(window.initAgents) window.initAgents(); }catch(e){}
+    try{ if(window.initImport) window.initImport(); }catch(e){}
+    var tagStatus = function(){
+      try{
+        return 'build v' + window.__GISMAP_V +
+          ' · map:' + (!!window.L ? 'ok' : 'blocked') +
+          ' · agents:' + (document.querySelector('.agent-card') ? 'ok' : 'missing') +
+          ' · log:[' + window.__gisLoadLog.slice(-4).join(' | ') + ']';
+      }catch(e){ return 'build tag error'; }
+    };
+    try{ var bt = document.getElementById('buildTag'); if(bt) bt.textContent = tagStatus(); }catch(e){}
+    /* self-heal: retry init; once with a timestamp-busted agents.js (stale-byte cache) */
+    var tries = 0, busted = false;
+    var heal = setInterval(function(){
+      tries++;
+      var ok = !!document.querySelector('.agent-card');
+      if(!ok && window.initAgents){ try{ window.__agentsDone = false; window.initAgents(); }catch(e){} }
+      if(!ok && !busted && tries >= 2){
+        busted = true;
+        try{
+          if(window.fetch){
+            __gisInjectVerified('agents.js', '/*GISMAP_EOF:agents*/').then(function(){
+              try{ window.__agentsDone = false; if(window.initAgents) window.initAgents(); }catch(e){}
+            }).catch(function(){});
+          } else {
+            __gisLoadScript('agents.js?v=' + window.__GISMAP_V + '&t=' + Date.now(), 15000).then(function(){
+              try{ window.__agentsDone = false; if(window.initAgents) window.initAgents(); }catch(e){}
+            }).catch(function(){});
+          }
+        }catch(e){}
+      }
+      ok = !!document.querySelector('.agent-card');
+      if(ok || tries >= 5){
+        try{ var bt2 = document.getElementById('buildTag'); if(bt2) bt2.textContent = tagStatus(); }catch(e){}
+        clearInterval(heal);
+      }
+    }, 3000);
+    setTimeout(function(){
+      var hasData = (typeof WILAYAS !== 'undefined' && WILAYAS && WILAYAS.length);
+      var hasMap = (typeof L !== 'undefined' && !!L);
+      if(!hasData || !hasMap){
+        var d = document.createElement('div');
+        d.style.cssText = 'background:#7f1d1d;color:#fff;padding:12px;text-align:center;font-weight:700;position:sticky;top:0;z-index:9999';
+        d.textContent = !hasData
+          ? 'App files could not load — check your connection and hard-refresh (Ctrl+Shift+R).'
+          : 'Map library blocked by network/CDN — tables, agents and import still work below; allow unpkg/jsdelivr/cdnjs and reload for the map.';
+        document.body.insertBefore(d, document.body.firstChild);
+      }
+    }, 600);
+  });
+};
+window.addEventListener('DOMContentLoaded', function(){ window.__gisBoot(); });
+</script>
+<link rel="stylesheet" href="style.css?v=15">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand-block">
+    <img class="logo-img" src="assets/logo.svg" width="52" height="52" alt="gis_map logo">
+    <div>
+      <div class="brand">gis_map 🗺️ <span class="brand-sep">—</span> <span class="brand-sub">Geo-Intelligence for Algeria</span> <span class="badge">GIS + AI</span></div>
+      <div class="tagline">See the problem on the map, find the solution.</div>
+    </div>
+  </div>
+  <div class="top-actions">
+    <select id="sectorSelect" title="Sector">
+      <option value="all">All sectors</option>
+      <option value="realestate">🏠 Real estate</option>
+      <option value="agri">🌾 Agriculture</option>
+      <option value="water">💧 Water</option>
+      <option value="commerce">🛒 Retail coverage</option>
+      <option value="industry">🏭 Industry</option>
+    </select>
+    <select id="wilayaSelect" title="Wilaya"></select>
+    <input id="searchBox" placeholder="Search wilaya… (e.g. Setif)">
+    <button id="aiBtn" class="btn-primary">🤖 Run AI analysis</button>
+    <button id="importBtn" class="btn-ghost" onclick="document.getElementById('import').scrollIntoView({behavior:'smooth'})">📥 Import</button>
+    <button id="agentsBtn" class="btn-ghost" onclick="document.getElementById('agents').scrollIntoView({behavior:'smooth'})">🧠 Agents</button>
+    <button id="reportBtn" class="btn-ghost">📄 Report / تقرير</button>
+  </div>
+</header>
+
+<div class="hero">
+  <img class="hero-banner" src="assets/banner.svg" alt="gis_map — Geo-Intelligence for Algeria">
+  <div class="hero-row">
+  <div><strong>From crisis response → to forecasting.</strong> Every economic and social issue in Algeria has an address on the ground. gis_map layers land, prices, soil, rainfall, dams, markets and factories on one map — then AI reads the data, flags anomalies and forecasts 2030.</div>
+  <div class="hero-pills"><span>🏠 Housing</span><span>🌾 Farming</span><span>💧 Water</span><span>🛒 Retail</span><span>🏭 Industry</span></div>
+  </div>
+</div>
+
+<main>
+  <aside id="layersPanel" class="card">
+    <h3>🧭 GIS layers</h3>
+    <label><input type="checkbox" data-layer="realestate" checked> 🏠 Real estate: land, prices, flood risk</label>
+    <label><input type="checkbox" data-layer="agri" checked> 🌾 Agriculture: soil, rainfall, NDVI</label>
+    <label><input type="checkbox" data-layer="water" checked> 💧 Water: dams, wells, deficit</label>
+    <label><input type="checkbox" data-layer="commerce" checked> 🛒 Retail: markets & coverage</label>
+    <label><input type="checkbox" data-layer="industry" checked> 🏭 Industry: energy, roads, labor</label>
+    <hr>
+    <h3>🤖 AI engine</h3>
+    <label><input type="checkbox" id="aiAnomaly" checked> Anomaly detection</label>
+    <label><input type="checkbox" id="aiForecast" checked> Forecast to <b id="yearLabel">2030</b></label>
+    <input type="range" id="yearRange" min="2026" max="2035" value="2030" style="width:100%">
+    <hr>
+    <div id="legend"></div>
+    <hr>
+    <div id="kpi"></div>
+  </aside>
+
+  <section id="mapWrap" class="card">
+    <div id="map"></div>
+    <div id="mapHint">Click any wilaya circle for diagnosis & forecast 👇</div>
+  </section>
+
+  <aside id="detailPanel" class="card">
+    <h2 id="wName">Select a wilaya</h2>
+    <div id="wMeta"></div>
+    <canvas id="chartWater" height="140"></canvas>
+    <canvas id="chartRadar" height="160"></canvas>
+    <div id="aiBox"></div>
+    <div id="actions"></div>
+  </aside>
+</main>
+
+<section id="import" class="card">
+  <h2>📥 Data Import — feed the map with your own files</h2>
+  <p class="agents-sub">CSV, Excel (.xlsx), TXT, JSON, GeoJSON, KML, zipped Shapefiles (.zip with .shp+.dbf) and SQLite databases (.db) — from file <b>or URL</b>. Columns auto-map to the 18 indicators — adjust, preview, then merge. Export the enriched dataset back to CSV / Excel / GeoJSON / KML.</p>
+  <div class="agent-controls">
+    <input type="file" id="importFile" accept=".csv,.txt,.tsv,.xlsx,.xls,.json,.geojson,.kml,.zip,.db,.sqlite,.sqlite3">
+    <button id="importMerge" class="btn-primary">⬇ Merge into map</button>
+    <button id="importTemplate" class="btn-ghost">📄 CSV template</button>
+  </div>
+  <div class="agent-controls">
+    <select id="importPreset" title="Ready-made sources" style="max-width:280px">
+      <option value="">🌍 Ready sources…</option>
+      <optgroup label="Algeria — open geo-data">
+        <option value="gadm-dz">GADM — Algeria provinces (polygons)</option>
+        <option value="osm-dams">OSM — dams &amp; reservoirs, Algeria (Overpass)</option>
+        <option value="osm-hosp">OSM — hospitals, Algiers (Overpass)</option>
+      </optgroup>
+      <optgroup label="Built-in samples (always work)">
+        <option value="sample-csv">Sample — wilaya indicators (CSV)</option>
+        <option value="sample-dams">Sample — dams (GeoJSON)</option>
+      </optgroup>
+      <optgroup label="World">
+        <option value="world">World countries (GeoJSON)</option>
+      </optgroup>
+    </select>
+    <input id="importURL" type="url" placeholder="https://…/data.csv (CSV, JSON, GeoJSON, KML)" style="flex:1;min-width:240px">
+    <button id="importFetch" class="btn-primary">🌐 Fetch URL</button>
+    <button id="importDownload" class="btn-ghost" title="Download the raw fetched file">⬇ Raw file</button>
+    <label title="Route through a public CORS proxy if the site blocks cross-origin reads"><input type="checkbox" id="importProxy"> via proxy</label>
+  </div>
+  <div class="agent-controls">
+    <span style="color:#9AA9C7;font-size:13px">Export dataset:</span>
+    <button class="btn-ghost" data-export="csv">CSV</button>
+    <button class="btn-ghost" data-export="xlsx">Excel</button>
+    <button class="btn-ghost" data-export="geojson">GeoJSON</button>
+    <button class="btn-ghost" data-export="kml">KML</button>
+  </div>
+  <div id="importStatus" class="import-status">No file loaded.</div>
+  <div class="import-map" id="importMap"></div>
+  <div id="importPreview" class="import-preview"></div>
+</section>
+
+<section id="agents" class="card">
+  <h2>🧠 AI Agent Team — map analysis, crisis management & forecasting</h2>
+  <p class="agents-sub">Seven specialist agents. Pick one for its playbook — or convene the <b>Council</b> for a consensus decision. Works offline out of the box; add an OpenRouter key for live model calls.</p>
+  <div class="agent-grid" id="agentGrid"><span style="color:#9AA9C7">Loading agents… (if this persists, hard-refresh: Ctrl+Shift+R)</span></div>
+  <div class="agent-controls">
+    <select id="agentScope" title="Scope">
+      <option value="national">National flashpoints</option>
+    </select>
+    <button id="agentRun" class="btn-primary">▶ Ask agent</button>
+    <button id="agentCouncil" class="btn-gold">🏛️ Convene council</button>
+  </div>
+  <div class="agent-key">
+    <label><input type="checkbox" id="agentLive"> Live models (OpenRouter)</label>
+    <input id="orKey" type="password" placeholder="OpenRouter API key (optional, stored locally)">
+  </div>
+  <div id="agentOutput" class="agent-output"><span style="color:#9AA9C7">Select an agent and press “Ask agent”.</span></div>
+</section>
+
+<section id="aiDashboard" class="card">
+  <h2>🤖 National forecast dashboard — <span id="dashYear">2030</span></h2>
+  <div class="cards" id="dashCards"></div>
+  <div class="tables">
+    <div><h3>🔴 Thirst-risk wilayas</h3><ol id="thirstList"></ol></div>
+    <div><h3>🌾 Drought risk on crops</h3><ol id="droughtList"></ol></div>
+    <div><h3>🏙️ Where will cities expand?</h3><ol id="urbanList"></ol></div>
+    <div><h3>⚠️ Anomalies flagged by AI</h3><ol id="anomalyList"></ol></div>
+  </div>
+</section>
+
+<footer>
+  <div class="foot-brand">gis_map — Geo-Intelligence for Algeria 🇩🇿</div>
+  <div class="foot-note">Demo data for illustration; connect real ONM / ANRH / DSA / ONS feeds + Sentinel-2 imagery for production.</div>
+  <div class="copyright">© 2026 Copyright salim-slimani. All rights reserved. <span id="buildTag">build …</span></div>
+</footer>
+
+<noscript><div style="background:#7f1d1d;color:#fff;padding:12px;text-align:center;font-weight:700">gis_map needs JavaScript enabled.</div></noscript>
+</body>
+</html>
