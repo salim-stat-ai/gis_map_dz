@@ -5,7 +5,7 @@
  * © 2026 Salim Slimani & National Foresight System
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { WilayaRecord } from '../types';
 import {
   generateStrategicReportHtml,
@@ -17,7 +17,7 @@ import {
   ReportLang
 } from '../engines/reporting';
 import { conveneAiCouncil } from '../engines/council';
-import { Printer, Download, X, FileText, Layers, Check, Calendar, Globe, Sparkles } from 'lucide-react';
+import { Printer, Download, X, FileText, Sparkles, RefreshCw } from 'lucide-react';
 
 interface ReportModalProps {
   isOpen: boolean;
@@ -36,31 +36,52 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   targetYear: propTargetYear,
   initialLang = 'en'
 }) => {
-  if (!isOpen) return null;
-
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // States
   const [mode, setMode] = useState<ReportMode>('combined');
   const [scope, setScope] = useState<ReportScope>('wilaya');
   const [activeWilaya, setActiveWilaya] = useState<WilayaRecord>(selectedWilaya);
-  const [compareWilayas, setCompareWilayas] = useState<WilayaRecord[]>([
+  const [compareWilayas, setCompareWilayas] = useState<WilayaRecord[]>(() => [
     selectedWilaya,
-    wilayas.find(w => w.en === 'Algiers') || wilayas[15],
-    wilayas.find(w => w.en === 'Oran') || wilayas[30],
-    wilayas.find(w => w.en === 'Constantine') || wilayas[24]
+    wilayas.find(w => w.en === 'Algiers') || wilayas[15] || wilayas[0],
+    wilayas.find(w => w.en === 'Oran') || wilayas[30] || wilayas[0],
+    wilayas.find(w => w.en === 'Constantine') || wilayas[24] || wilayas[0]
   ]);
   const [thematicCase, setThematicCase] = useState<ThematicCaseKey>('water');
   const [targetYear, setTargetYear] = useState<number>(propTargetYear || 2030);
   const [reportLang, setReportLang] = useState<ReportLang>(initialLang);
+  const [refreshTick, setRefreshTick] = useState<number>(0);
+
+  // Sync active report settings whenever main app selection or dataset updates
+  useEffect(() => {
+    const matched = wilayas.find(w => w.num === selectedWilaya.num) || selectedWilaya;
+    setActiveWilaya(matched);
+  }, [selectedWilaya, wilayas]);
+
+  useEffect(() => {
+    if (propTargetYear) setTargetYear(propTargetYear);
+  }, [propTargetYear]);
+
+  useEffect(() => {
+    setReportLang(initialLang);
+  }, [initialLang]);
+
+  useEffect(() => {
+    setCompareWilayas(prev =>
+      prev.map(cw => wilayas.find(w => w.num === cw.num) || cw)
+    );
+  }, [wilayas]);
+
+  if (!isOpen) return null;
 
   const isAr = reportLang === 'ar';
   const isFr = reportLang === 'fr';
 
-  // Council Data
+  // Council Data (freshly convened on current wilaya, dataset, year, lang)
   const councilData = conveneAiCouncil(activeWilaya, wilayas, targetYear, reportLang === 'fr' ? 'en' : reportLang);
 
-  // Generate HTML
+  // Generate Live HTML Report
   const reportHtml = generateStrategicReportHtml({
     mode,
     scope,
@@ -79,8 +100,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
       try {
         iframeRef.current.contentWindow.focus();
         iframeRef.current.contentWindow.print();
-      } catch (err) {
-        // Fallback
+      } catch {
         const printWindow = window.open('', '_blank');
         if (printWindow) {
           printWindow.document.write(reportHtml);
@@ -97,6 +117,12 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   const handleDownloadHtml = () => {
     const filename = `gis_map_${mode}_${scope}_${activeWilaya.en}_${targetYear}.html`;
     downloadReportHtml(reportHtml, filename);
+  };
+
+  const handleRefreshReport = () => {
+    const freshSelected = wilayas.find(w => w.num === selectedWilaya.num) || selectedWilaya;
+    setActiveWilaya(freshSelected);
+    setRefreshTick(t => t + 1);
   };
 
   const handleToggleCompareWilaya = (w: WilayaRecord) => {
@@ -124,12 +150,23 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                   {isAr ? 'مركز توليد التقارير الجيو-استخبارية والاستشرافية' : isFr ? 'Centre de Rapports Géo-Stratégiques & Prospective' : 'Geo-Intelligence & Sovereign Foresight Reports'}
                 </b>
                 <span className="text-xs text-slate-400 ms-2">
-                  {activeWilaya.num}. {isAr ? activeWilaya.n : activeWilaya.en} — {targetYear}
+                  {activeWilaya.num}. {isAr ? activeWilaya.n : activeWilaya.en} — {targetYear} ({wilayas.length} {isAr ? 'ولاية' : 'wilayas'})
                 </span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Manual Refresh / Live Update */}
+              <button
+                type="button"
+                onClick={handleRefreshReport}
+                title={isAr ? 'تحيين التقرير بالبيانات الحالية' : 'Refresh report with latest calculations'}
+                className="flex items-center gap-1 bg-[#142347] hover:bg-[#1E315C] text-emerald-300 border border-emerald-500/30 text-xs px-2.5 py-1.5 rounded-lg font-semibold transition cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>{isAr ? 'تحيين' : isFr ? 'Actualiser' : 'Refresh'}</span>
+              </button>
+
               {/* Language Switcher */}
               <div className="flex items-center bg-[#142347] border border-white/10 rounded-lg p-0.5 text-xs">
                 <button
@@ -158,7 +195,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                 className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs px-3.5 py-1.5 rounded-lg shadow transition cursor-pointer"
               >
                 <Printer className="w-3.5 h-3.5" />
-                <span>{isAr ? '🖨️ طباعة / PDF' : 'Print / PDF'}</span>
+                <span>{isAr ? '🖨️ طباعة / PDF' : isFr ? 'Imprimer / PDF' : 'Print / PDF'}</span>
               </button>
 
               {/* Download Standalone HTML */}
@@ -172,7 +209,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
 
               {/* Download CSV */}
               <button
-                onClick={() => downloadWilayasCsv(wilayas)}
+                onClick={() => downloadWilayasCsv(wilayas, `algeria_geo_intelligence_${targetYear}.csv`, targetYear)}
                 className="flex items-center gap-1.5 bg-[#172545] hover:bg-[#1E315C] text-slate-200 border border-white/10 text-xs px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5 text-amber-400" />
@@ -202,7 +239,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                 }`}
               >
                 <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                <span>{isAr ? '📑 الملف المدمج الشامل' : 'Unified Master Dossier'}</span>
+                <span>{isAr ? '📑 الملف المدمج الشامل' : isFr ? 'Dossier Unifié Complet' : 'Unified Master Dossier'}</span>
               </button>
 
               <button
@@ -213,7 +250,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                     : 'text-slate-300 hover:text-white'
                 }`}
               >
-                <span>{isAr ? '📜 تقرير التطبيق القديم المفصّل (7 أقسام)' : 'Legacy Master Report'}</span>
+                <span>{isAr ? '📜 تقرير التطبيق القديم المفصّل (7 أقسام)' : isFr ? 'Rapport Détaillé (7 Sections)' : 'Legacy Master Report'}</span>
               </button>
 
               <button
@@ -224,28 +261,26 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                     : 'text-slate-300 hover:text-white'
                 }`}
               >
-                <span>{isAr ? '🚀 استشراف 2030 والذكاء الاصطناعي' : 'Sovereign Foresight 2030'}</span>
+                <span>{isAr ? '🚀 استشراف 2030 والذكاء الاصطناعي' : isFr ? 'Prospective 2030 & IA' : 'Sovereign Foresight 2030'}</span>
               </button>
             </div>
 
             {/* Scope, Wilaya, Case & Horizon Options */}
             <div className="flex flex-wrap items-center gap-2">
-              {/* Scope */}
               <div className="flex items-center gap-1">
-                <span className="text-slate-400 font-medium">{isAr ? 'النطاق:' : 'Scope:'}</span>
+                <span className="text-slate-400 font-medium">{isAr ? 'النطاق:' : isFr ? 'Portée :' : 'Scope:'}</span>
                 <select
                   value={scope}
                   onChange={(e) => setScope(e.target.value as ReportScope)}
                   className="bg-[#142347] border border-white/15 text-slate-200 rounded px-2 py-1 outline-none focus:border-sky-500 cursor-pointer text-xs"
                 >
-                  <option value="wilaya">{isAr ? '📍 ولاية واحدة' : 'Single Wilaya'}</option>
-                  <option value="compare">{isAr ? '⚖️ مقارنة ولايات' : 'Compare Wilayas'}</option>
-                  <option value="case">{isAr ? '🎯 حالة موضوعاتية' : 'Thematic Case'}</option>
-                  <option value="national">{isAr ? '🇩🇿 توليف وطني شامل (58)' : 'National (58 Wilayas)'}</option>
+                  <option value="wilaya">{isAr ? '📍 ولاية واحدة' : isFr ? 'Une Wilaya' : 'Single Wilaya'}</option>
+                  <option value="compare">{isAr ? '⚖️ مقارنة ولايات' : isFr ? 'Comparer Wilayas' : 'Compare Wilayas'}</option>
+                  <option value="case">{isAr ? '🎯 حالة موضوعاتية' : isFr ? 'Cas Thématique' : 'Thematic Case'}</option>
+                  <option value="national">{isAr ? `🇩🇿 توليف وطني شامل (${wilayas.length})` : isFr ? `Synthèse Nationale (${wilayas.length})` : `National (${wilayas.length} Wilayas)`}</option>
                 </select>
               </div>
 
-              {/* Wilaya Picker (for single wilaya) */}
               {scope === 'wilaya' && (
                 <div className="flex items-center gap-1">
                   <span className="text-slate-400 font-medium">{isAr ? 'الولاية:' : 'Wilaya:'}</span>
@@ -255,7 +290,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                       const found = wilayas.find(w => w.num === Number(e.target.value));
                       if (found) setActiveWilaya(found);
                     }}
-                    className="bg-[#142347] border border-white/15 text-slate-200 rounded px-2 py-1 outline-none focus:border-sky-500 cursor-pointer text-xs max-w-[140px]"
+                    className="bg-[#142347] border border-white/15 text-slate-200 rounded px-2 py-1 outline-none focus:border-sky-500 cursor-pointer text-xs max-w-[150px]"
                   >
                     {wilayas.map(w => (
                       <option key={w.num} value={w.num}>
@@ -266,35 +301,33 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                 </div>
               )}
 
-              {/* Thematic Case Picker */}
               {scope === 'case' && (
                 <div className="flex items-center gap-1">
-                  <span className="text-slate-400 font-medium">{isAr ? 'الحالة:' : 'Case:'}</span>
+                  <span className="text-slate-400 font-medium">{isAr ? 'الحالة:' : isFr ? 'Cas :' : 'Case:'}</span>
                   <select
                     value={thematicCase}
                     onChange={(e) => setThematicCase(e.target.value as ThematicCaseKey)}
                     className="bg-[#142347] border border-white/15 text-slate-200 rounded px-2 py-1 outline-none focus:border-sky-500 cursor-pointer text-xs"
                   >
-                    <option value="water">{isAr ? '💧 أزمة مياه وعجز مائي' : 'Water Crisis'}</option>
-                    <option value="drought">{isAr ? '🌾 جفاف فلاحي ومحاصيل' : 'Crop Drought'}</option>
-                    <option value="urban">{isAr ? '🏙️ توسع عمراني وضغط' : 'Urban Expansion'}</option>
-                    <option value="retail">{isAr ? '🛒 فجوة تجارية وتموينية' : 'Retail Gap'}</option>
-                    <option value="flood">{isAr ? '🌊 فيضانات ومضاربة عقار' : 'Floods & Speculation'}</option>
-                    <option value="industry">{isAr ? '🏭 جاهزية صناعية واستثمار' : 'Industry Readiness'}</option>
-                    <option value="anomaly">{isAr ? '⚠️ شذوذات إحصائية بالذكاء' : 'AI Anomalies'}</option>
+                    <option value="water">{isAr ? '💧 أزمة مياه وعجز مائي' : isFr ? 'Crise Hydrique' : 'Water Crisis'}</option>
+                    <option value="drought">{isAr ? '🌾 جفاف فلاحي ومحاصيل' : isFr ? 'Sécheresse Agricole' : 'Crop Drought'}</option>
+                    <option value="urban">{isAr ? '🏙️ توسع عمراني وضغط' : isFr ? 'Pression Urbaine' : 'Urban Expansion'}</option>
+                    <option value="retail">{isAr ? '🛒 فجوة تجارية وتموينية' : isFr ? 'Déficit Commercial' : 'Retail Gap'}</option>
+                    <option value="flood">{isAr ? '🌊 فيضانات ومضاربة عقار' : isFr ? 'Inondations & Foncier' : 'Floods & Speculation'}</option>
+                    <option value="industry">{isAr ? '🏭 جاهزية صناعية واستثمار' : isFr ? 'Potentiel Industriel' : 'Industry Readiness'}</option>
+                    <option value="anomaly">{isAr ? '⚠️ شذوذات إحصائية بالذكاء' : isFr ? 'Anomalies IA' : 'AI Anomalies'}</option>
                   </select>
                 </div>
               )}
 
-              {/* Horizon Slider/Picker */}
               <div className="flex items-center gap-1">
-                <span className="text-slate-400 font-medium">{isAr ? 'الأفق:' : 'Horizon:'}</span>
+                <span className="text-slate-400 font-medium">{isAr ? 'الأفق:' : isFr ? 'Horizon :' : 'Horizon:'}</span>
                 <select
                   value={targetYear}
                   onChange={(e) => setTargetYear(Number(e.target.value))}
                   className="bg-[#142347] border border-white/15 text-slate-200 rounded px-2 py-1 outline-none focus:border-sky-500 cursor-pointer text-xs"
                 >
-                  {[2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2035].map(y => (
+                  {[2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035].map(y => (
                     <option key={y} value={y}>{y}</option>
                   ))}
                 </select>
@@ -302,20 +335,20 @@ export const ReportModal: React.FC<ReportModalProps> = ({
             </div>
           </div>
 
-          {/* Multi-Wilaya Selection Strip (when in compare mode) */}
+          {/* Multi-Wilaya Selection Strip (when in compare mode - supports all wilayas) */}
           {scope === 'compare' && (
-            <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-white/10 text-xs">
-              <span className="text-amber-400 font-semibold me-1">
-                {isAr ? 'حدد حتى 6 ولايات للمقارنة:' : 'Select up to 6 wilayas:'}
+            <div className="flex items-center gap-1.5 pt-2 border-t border-white/10 text-xs overflow-x-auto pb-1">
+              <span className="text-amber-400 font-semibold me-1 shrink-0">
+                {isAr ? `حدد حتى 6 ولايات (${compareWilayas.length}/6):` : `Compare up to 6 (${compareWilayas.length}/6):`}
               </span>
-              {wilayas.slice(0, 18).map(w => {
+              {wilayas.map(w => {
                 const isSelected = compareWilayas.some(cw => cw.num === w.num);
                 return (
                   <button
                     key={w.num}
                     type="button"
                     onClick={() => handleToggleCompareWilaya(w)}
-                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer border ${
+                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer border shrink-0 ${
                       isSelected
                         ? 'bg-sky-600/30 border-sky-400 text-sky-200'
                         : 'bg-[#142347] border-white/10 text-slate-400 hover:text-slate-200'
@@ -333,6 +366,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
         {/* Modal Iframe Sandbox Preview */}
         <div className="flex-1 bg-white p-1 overflow-hidden relative">
           <iframe
+            key={`${mode}-${scope}-${activeWilaya.num}-${targetYear}-${reportLang}-${refreshTick}`}
             ref={iframeRef}
             title="Strategic Report Live Preview"
             srcDoc={reportHtml}

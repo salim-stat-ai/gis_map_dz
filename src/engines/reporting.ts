@@ -7,9 +7,11 @@
 
 import { CouncilConsensusResult, WilayaRecord } from '../types';
 import { executeForecastModel } from './quantitative';
-import { computeMoransI, computeGetisOrdGi, computeSpatialRegression } from './gis';
+import { runModelTournament } from './evaluation';
+import { computeMoransI, computeGetisOrdGi, computeSpatialRegression, haversineDistance } from './gis';
 import { generateAllPathways } from './scenario';
 import { scanNationalEarlyWarnings } from './earlyWarning';
+import { AI_AGENT_PROFILES, runAgentAnalysis } from './agents';
 
 export type ReportMode = 'legacy' | 'modern' | 'combined';
 export type ReportScope = 'wilaya' | 'compare' | 'case' | 'national';
@@ -119,7 +121,7 @@ export function riskOf(w: WilayaRecord, year: number): number {
   const cr = cropRisk(w, year);
   const cg = coverageGap(w);
   let s = 0;
-  if (pw < -25) s += 2; else if (pw < -10) s += 1;
+  if (pw < -250 || w.waterDef < -25) s += 2; else if (pw < -100 || w.waterDef < -10) s += 1;
   if (w.flood > 0.4) s += 2; else if (w.flood > 0.25) s += 1;
   if (cr > 60) s += 2; else if (cr > 45) s += 1;
   if (cg > 30) s += 1;
@@ -189,7 +191,7 @@ export function generateActionPlan(w: WilayaRecord, year: number, lang: ReportLa
   const plan: ActionPlanItem[] = [];
 
   // 1. Water Action
-  if (pw < -25) {
+  if (pw < -250 || w.waterDef < -25) {
     plan.push({
       priority: isAr ? 'عاجل P1' : isFr ? 'Urgent P1' : 'Urgent P1',
       action: isAr
@@ -201,7 +203,7 @@ export function generateActionPlan(w: WilayaRecord, year: number, lang: ReportLa
       owner: isAr ? 'وزارة الموارد المائية + ANRH + ADE' : isFr ? 'Hydraulique + ANRH + ADE' : 'Ministry of Water + ANRH + ADE',
       impact: isAr ? 'تقليص العجز المائي بنسبة 40% وضمان مياه الشرب' : isFr ? 'Réduction du déficit de 40%' : 'Reduce water deficit by 40%'
     });
-  } else if (pw < -10) {
+  } else if (pw < -100 || w.waterDef < -10) {
     plan.push({
       priority: isAr ? 'متوسط P2' : isFr ? 'Moyen P2' : 'Medium P2',
       action: isAr
@@ -483,32 +485,33 @@ export const ALL_18_INDICATORS: IndicatorDefinition[] = [
 ];
 
 // Helper to filter thematic cases
-export function filterThematicCase(wilayas: WilayaRecord[], kind: ThematicCaseKey, year: number): { w: WilayaRecord; score: number; reason: string }[] {
+export function filterThematicCase(wilayas: WilayaRecord[], kind: ThematicCaseKey, year: number, lang: ReportLang = 'ar'): { w: WilayaRecord; score: number; reason: string }[] {
+  const isAr = lang === 'ar';
   const scored = wilayas.map(w => {
     let score = 0;
     let reason = '';
     if (kind === 'water') {
       score = predictWater(w, year);
-      reason = `العجز المتوقع: ${score}`;
+      reason = isAr ? `العجز المتوقع: ${score}` : `Projected Balance: ${score}`;
     } else if (kind === 'drought') {
       score = -cropRisk(w, year);
-      reason = `خطر الجفاف: ${cropRisk(w, year)}%`;
+      reason = isAr ? `خطر الجفاف: ${cropRisk(w, year)}%` : `Drought Risk: ${cropRisk(w, year)}%`;
     } else if (kind === 'urban') {
       score = -urbanGrowth(w, year);
-      reason = `توسع عمراني: +${urbanGrowth(w, year)}%`;
+      reason = isAr ? `توسع عمراني: +${urbanGrowth(w, year)}%` : `Urban Expansion: +${urbanGrowth(w, year)}%`;
     } else if (kind === 'retail') {
       score = -coverageGap(w);
-      reason = `فجوة التموين: ${coverageGap(w)}%`;
+      reason = isAr ? `فجوة التموين: ${coverageGap(w)}%` : `Supply Gap: ${coverageGap(w)}%`;
     } else if (kind === 'flood') {
       score = -(w.flood * 100 + (w.price / 40000));
-      reason = `فيضان: ${Math.round(w.flood * 100)}%، سعر العقار: ${w.price.toLocaleString()} دج`;
+      reason = isAr ? `فيضان: ${Math.round(w.flood * 100)}%، سعر العقار: ${w.price.toLocaleString()} دج` : `Flood: ${Math.round(w.flood * 100)}%, Price: ${w.price.toLocaleString()} DZD`;
     } else if (kind === 'industry') {
       score = industryScore(w);
-      reason = `جاهزية صناعية: ${industryScore(w)}/100`;
+      reason = isAr ? `جاهزية صناعية: ${industryScore(w)}/100` : `Industry Score: ${industryScore(w)}/100`;
     } else if (kind === 'anomaly') {
-      const an = detectAnomaly(w, 'ar');
+      const an = detectAnomaly(w, lang);
       score = an ? -100 : 0;
-      reason = an || 'مؤشرات مستقرة';
+      reason = an || (isAr ? 'مؤشرات مستقرة' : 'Stable indicators');
     }
     return { w, score, reason };
   });
@@ -548,7 +551,7 @@ export function generateLegacyDetailedReportHtml(options: ReportGenerationOption
   } else if (scope === 'national') {
     targetList = allWilayas;
   } else if (scope === 'case') {
-    targetList = filterThematicCase(allWilayas, thematicCase, targetYear).map(item => item.w);
+    targetList = filterThematicCase(allWilayas, thematicCase, targetYear, lang).map(item => item.w);
   }
 
   const reportId = `GIS-${targetYear}-${mainW.num}-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -566,7 +569,7 @@ export function generateLegacyDetailedReportHtml(options: ReportGenerationOption
 <html lang="${lang}" dir="${dir}">
 <head>
   <meta charset="UTF-8">
-  <title>gis_map — ${isAr ? 'التقرير الجيو-استخباري المفصّل' : 'Detailed Geo-Intelligence Report'} — ${mainW.en}</title>
+  <title>gis_map — ${isAr ? 'التقرير الجيو-استخباري المفصّل' : isFr ? 'Rapport Géo-Intelligence Détaillé' : 'Detailed Geo-Intelligence Report'} — ${mainW.en}</title>
   <style>
     ${getSharedReportCss(isAr)}
   </style>
@@ -579,22 +582,22 @@ export function generateLegacyDetailedReportHtml(options: ReportGenerationOption
         <div class="rep-logo">🗺️</div>
         <div>
           <div class="rep-title">${isAr ? 'التقرير الجيو-استخباري المفصّل للولايات والحالات' : isFr ? 'Rapport Géo-Intelligence Détaillé des Wilayas' : 'Detailed Geo-Intelligence Report — Wilayas & Cases'}</div>
-          <div class="rep-sub">gis_map · GIS + AI Decision Platform — ${isAr ? 'الجمهورية الجزائرية الديمقراطية الشعبية' : 'People\'s Democratic Republic of Algeria'}</div>
+          <div class="rep-sub">gis_map · GIS + AI Decision Platform — ${isAr ? 'الجمهورية الجزائرية الديمقراطية الشعبية' : isFr ? 'République Algérienne Démocratique et Populaire' : "People's Democratic Republic of Algeria"}</div>
         </div>
       </div>
       <h1 class="rep-h1">
-        ${scope === 'wilaya' ? (isAr ? `ولاية ${mainW.n} (${mainW.en})` : `Wilaya of ${mainW.en} (${mainW.n})`)
-          : scope === 'compare' ? (isAr ? `مقارنة استراتيجية لـ ${targetList.length} ولايات` : `Comparative Analysis (${targetList.length} Wilayas)`)
+        ${scope === 'wilaya' ? (isAr ? `ولاية ${mainW.n} (${mainW.en})` : isFr ? `Wilaya de ${mainW.en} (${mainW.n})` : `Wilaya of ${mainW.en} (${mainW.n})`)
+          : scope === 'compare' ? (isAr ? `مقارنة استراتيجية لـ ${targetList.length} ولايات` : isFr ? `Analyse Comparative (${targetList.length} Wilayas)` : `Comparative Analysis (${targetList.length} Wilayas)`)
           : scope === 'case' ? (isAr ? `تحليل موضوعاتي: ${getCaseTitleAr(thematicCase)}` : `Thematic Case: ${thematicCase}`)
-          : (isAr ? 'التوليف الوطني الشامل — 58 ولاية' : 'Comprehensive National Synthesis — 58 Wilayas')}
+          : (isAr ? `التوليف الوطني الشامل — ${allWilayas.length} ولاية` : isFr ? `Synthèse Nationale Globale — ${allWilayas.length} Wilayas` : `Comprehensive National Synthesis — ${allWilayas.length} Wilayas`)}
       </h1>
       <div class="rep-meta">
-        <span>🆔 ${isAr ? 'رقم التقرير' : 'Report ID'}: <b>${reportId}</b></span>
-        <span>📅 ${isAr ? 'التاريخ' : 'Date'}: <b>${dateStr}</b></span>
-        <span>🎯 ${isAr ? 'أفق الاستشراف' : 'Horizon'}: <b>${targetYear}</b></span>
-        <span>📦 ${isAr ? 'الولايات المشمولة' : 'Scope'}: <b>${targetList.length}</b></span>
+        <span>🆔 ${isAr ? 'رقم التقرير' : isFr ? 'Réf.' : 'Report ID'}: <b>${reportId}</b></span>
+        <span>📅 ${isAr ? 'التاريخ' : isFr ? 'Date' : 'Date'}: <b>${dateStr}</b></span>
+        <span>🎯 ${isAr ? 'أفق الاستشراف' : isFr ? 'Horizon' : 'Horizon'}: <b>${targetYear}</b></span>
+        <span>📦 ${isAr ? 'الولايات المشمولة' : isFr ? 'Wilayas' : 'Scope'}: <b>${targetList.length}</b></span>
       </div>
-      <div class="rep-class">${isAr ? 'وثيقة استشراف رسمية — للاستغلال الإداري والاستراتيجي' : 'Official Foresight Document — Internal Strategic Use'}</div>
+      <div class="rep-class">${isAr ? 'وثيقة استشراف رسمية — للاستغلال الإداري والاستراتيجي' : isFr ? 'Document Officiel de Prospective — Usage Stratégique' : 'Official Foresight Document — Internal Strategic Use'}</div>
     </header>
 
     <!-- Executive Summary & Key Figures -->
@@ -661,14 +664,33 @@ export function generateLegacyDetailedReportHtml(options: ReportGenerationOption
                 </thead>
                 <tbody>
                   ${ALL_18_INDICATORS.map(ind => {
-                    const val = ind.getValue(w);
-                    const avg = calcNatAvg(allWilayas, ind.getValue);
-                    const rank = calcRankOf(allWilayas, w, ind.getValue, !ind.invertStatus);
+                    const dynamicGetter =
+                      ind.key === 'cropRisk'
+                        ? (x: WilayaRecord) => cropRisk(x, targetYear)
+                        : ind.key === 'urbanGrowth'
+                        ? (x: WilayaRecord) => urbanGrowth(x, targetYear)
+                        : ind.getValue;
+                    const val = dynamicGetter(w);
+                    const avg = calcNatAvg(allWilayas, dynamicGetter);
+                    const rank = calcRankOf(allWilayas, w, dynamicGetter, !ind.invertStatus);
                     const vsAvg = vsAvgText(val, avg, lang, ind.invertStatus);
+                    const formattedVal =
+                      ind.key === 'cropRisk'
+                        ? `${val}%`
+                        : ind.key === 'urbanGrowth'
+                        ? `+${val}%`
+                        : ind.format(w);
+                    const rawName = isAr ? ind.nameAr : isFr ? ind.nameFr : ind.nameEn;
+                    const labelName =
+                      ind.key === 'urbanGrowth'
+                        ? rawName.replace('2030', String(targetYear))
+                        : ind.key === 'cropRisk'
+                        ? `${rawName} (${targetYear})`
+                        : rawName;
                     return `
                       <tr>
-                        <td><b>${isAr ? ind.nameAr : ind.nameEn}</b> <small>(${ind.unit})</small></td>
-                        <td><b>${ind.format(w)}</b></td>
+                        <td><b>${labelName}</b> <small>(${ind.unit})</small></td>
+                        <td><b>${formattedVal}</b></td>
                         <td>${ind.key === 'flood' ? Math.round(avg) + '%' : ind.key === 'price' ? Math.round(avg).toLocaleString() : Math.round(avg * 10) / 10}</td>
                         <td>${rank}</td>
                         <td>${vsAvg}</td>
@@ -700,10 +722,12 @@ export function generateLegacyDetailedReportHtml(options: ReportGenerationOption
               <span class="rep-risk r${riskOf(w, targetYear)}">${riskLabel(riskOf(w, targetYear), lang)}</span>
             </div>
             <div class="rep-sect">
-              <b>💧 ${isAr ? 'الموارد المائية وتحلية المياه' : 'Water Resources & Desalination'}</b>
+              <b>💧 ${isAr ? 'الموارد المائية وتحلية المياه' : isFr ? 'Ressources Hydriques & Dessalement' : 'Water Resources & Desalination'}</b>
               <p>${isAr
-                ? `تتوفر الولاية على ${w.dams} سدود و${w.wells.toLocaleString()} بئراً مرخصة. معدل الأمطار ${w.rain} ملم/سنة. العجز المتوقع لسنة ${targetYear} يبلغ <b>${pw}</b>. ${pw < -25 ? 'الوضعية حرجة للغاية تستدعي تدخلاً استعجالياً بربط محطات تحلية مياه البحر.' : 'الوضعية تحت المراقبة الهيدرولوجية مع ضرورة مكافحة التسربات.'}`
-                : `Wilaya infrastructure includes ${w.dams} dams and ${w.wells.toLocaleString()} boreholes. Projected deficit for ${targetYear} is ${pw}. Urgent intervention required.`
+                ? `تتوفر الولاية على ${w.dams} سدود و${w.wells.toLocaleString()} بئراً مرخصة. معدل الأمطار ${w.rain} ملم/سنة. العجز المتوقع لسنة ${targetYear} يبلغ <b>${pw}</b>. ${pw < -250 ? 'الوضعية حرجة للغاية تستدعي تدخلاً استعجالياً بربط محطات التحلية والتحويلات الكبرى.' : pw < -100 ? 'إجهاد مائي متوسط يتطلب تركيب عدادات رقمية ومكافحة التسربات.' : 'الرصيد الهيدرولوجي مستقر مع مواصلة مراقبة المنسوب.'}`
+                : isFr
+                ? `Infrastructure : ${w.dams} barrages et ${w.wells.toLocaleString()} forages (${w.rain} mm/an). Solde projeté ${targetYear} : <b>${pw}</b>. ${pw < -250 ? 'Déficit critique nécessitant dessalement et transferts.' : 'Suivi hydrologique et modernisation du réseau recommandés.'}`
+                : `Wilaya infrastructure includes ${w.dams} dams and ${w.wells.toLocaleString()} boreholes (${w.rain} mm/yr). Projected ${targetYear} balance: <b>${pw}</b>. ${pw < -250 ? 'Critical deficit requiring desalination and regional transfers.' : pw < -100 ? 'Moderate stress requiring smart metering and leak control.' : 'Hydrological reserve stable under active aquifer monitoring.'}`
               }</p>
             </div>
             <div class="rep-sect">
@@ -920,24 +944,49 @@ export function generateModernForesightReportHtml(options: ReportGenerationOptio
   const isAr = lang === 'ar';
   const isFr = lang === 'fr';
   const dir = isAr ? 'rtl' : 'ltr';
+  const engineLang: 'ar' | 'en' = isAr ? 'ar' : 'en';
 
   const years = [2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035];
-  const arimaResult = executeForecastModel('arima', w.historicalYears ?? [2018,2019,2020,2021,2022,2023,2024,2025], w.historicalWaterDef ?? [-10,-11,-12,-11,-13,-12,-14,-13], years);
+  const histYears = w.historicalYears ?? [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025];
+  const histWater = w.historicalWaterDef ?? Array(8).fill(w.waterDef);
+
+  const arimaResult = executeForecastModel('arima', histYears, histWater, years);
+  const tournament = runModelTournament(histYears, histWater, isAr ? w.n : w.en);
   const moranResult = computeMoransI(allWilayas, x => x.waterDef);
+  const hotspots = computeGetisOrdGi(allWilayas, x => x.waterDef);
+  const localHotspot = hotspots.find(h => h.wilayaNum === w.num);
   const sarResult = computeSpatialRegression(allWilayas, 'waterDef');
   const pathways = generateAllPathways(w);
-  const earlyWarnings = scanNationalEarlyWarnings(allWilayas);
+  const earlyWarnings = scanNationalEarlyWarnings(allWilayas, targetYear, engineLang);
+  const agentAnalyses = AI_AGENT_PROFILES.map(p => runAgentAnalysis(p.id, w, allWilayas, targetYear, engineLang));
+
+  // Nearest neighbor
+  let nearestPeer = w;
+  let nearestDist = Infinity;
+  for (const other of allWilayas) {
+    if (other.num === w.num) continue;
+    const d = haversineDistance(w.lat, w.lon, other.lat, other.lon);
+    if (d < nearestDist) {
+      nearestDist = d;
+      nearestPeer = other;
+    }
+  }
+  const distKm = Math.round(nearestDist === Infinity ? 0 : nearestDist);
 
   const reportId = `DZ-SOV-${w.num}-${targetYear}-${Date.now().toString().slice(-4)}`;
-  const dateStr = new Date().toLocaleDateString(isAr ? 'ar-DZ' : isFr ? 'fr-DZ' : 'en-US', {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString(isAr ? 'ar-DZ' : isFr ? 'fr-DZ' : 'en-US', {
     year: 'numeric', month: 'long', day: 'numeric'
+  });
+  const timeStr = now.toLocaleTimeString(isAr ? 'ar-DZ' : isFr ? 'fr-DZ' : 'en-US', {
+    hour: '2-digit', minute: '2-digit'
   });
 
   return `<!DOCTYPE html>
 <html lang="${lang}" dir="${dir}">
 <head>
   <meta charset="UTF-8">
-  <title>${isAr ? 'تقرير الاستشراف السيادي الوطني 2030' : 'National Sovereign Foresight 2030 Report'} - ${w.en}</title>
+  <title>${isAr ? 'تقرير الاستشراف السيادي الوطني 2030' : isFr ? 'Rapport de Prospective Souveraine 2030' : 'National Sovereign Foresight 2030 Report'} - ${w.en}</title>
   <style>
     ${getSharedReportCss(isAr)}
   </style>
@@ -949,74 +998,106 @@ export function generateModernForesightReportHtml(options: ReportGenerationOptio
       <div class="rep-brand">
         <div class="rep-logo">🇩🇿</div>
         <div>
-          <div class="rep-title">${isAr ? 'التقرير الاستشرافي السيادي الوطني 2030' : isFr ? 'Rapport Stratégique de Prospective Souveraine 2030' : 'National Sovereign Strategic Foresight Report 2030'}</div>
-          <div class="rep-sub">AI + GIS + Quantitative Econometrics + Multi-Agent Intelligence — ${isAr ? 'الجمهورية الجزائرية الديمقراطية الشعبية' : 'Republic of Algeria'}</div>
+          <div class="rep-title">${isAr ? 'التقرير الاستشرافي السيادي الوطني المحدّث' : isFr ? 'Rapport Stratégique de Prospective Souveraine (Actualisé)' : 'Updated National Sovereign Foresight Report'}</div>
+          <div class="rep-sub">AI + GIS + 12 Quantitative Models + 7-Agent Intelligence — ${isAr ? 'الجمهورية الجزائرية الديمقراطية الشعبية' : isFr ? 'République Algérienne Démocratique et Populaire' : "People's Democratic Republic of Algeria"}</div>
         </div>
       </div>
-      <h1 class="rep-h1">${isAr ? `التحليل الاستشرافي المتكامل لولاية ${w.n} (${w.en})` : `Strategic Territorial Outlook: ${w.en} (${w.n})`}</h1>
+      <h1 class="rep-h1">${isAr ? `التحليل الاستشرافي المحدّث لولاية ${w.n} (${w.en})` : isFr ? `Analyse Prospective Actualisée : ${w.en} (${w.n})` : `Updated Strategic Outlook: ${w.en} (${w.n})`}</h1>
       <div class="rep-meta">
-        <span>🆔 ${isAr ? 'رقم الوثيقة' : 'Document ID'}: <b>${reportId}</b></span>
-        <span>📅 ${isAr ? 'تاريخ التوليد' : 'Generation Date'}: <b>${dateStr}</b></span>
-        <span>🎯 ${isAr ? 'الأفق الاستراتيجي' : 'Strategic Horizon'}: <b>${targetYear}</b></span>
-        <span>🏛️ ${isAr ? 'درجة السرية' : 'Classification'}: <b>وثيقة سيادية لدعم القرار</b></span>
+        <span>🆔 ${isAr ? 'رقم الوثيقة' : isFr ? 'Réf.' : 'Document ID'}: <b>${reportId}</b></span>
+        <span>📅 ${isAr ? 'تاريخ التحيين' : isFr ? 'Actualisé le' : 'Updated'}: <b>${dateStr} · ${timeStr}</b></span>
+        <span>🎯 ${isAr ? 'الأفق المستهدف' : isFr ? 'Horizon' : 'Target Horizon'}: <b>${targetYear}</b></span>
+        <span>📊 ${isAr ? 'النطاق النشط' : isFr ? 'Base Active' : 'Active Dataset'}: <b>${allWilayas.length} ${isAr ? 'ولاية' : 'wilayas'}</b></span>
       </div>
-      <div class="rep-class">${isAr ? 'مرصد الاستشراف الوطني 2030 — مجلس الوزراء والتخطيط' : 'National Foresight Observatory 2030 — Prime Ministry Support'}</div>
+      <div class="rep-class">${isAr ? 'نسخة محيّنة — مرصد الاستشراف الوطني 2030' : isFr ? 'Édition Actualisée — Observatoire National 2030' : 'Live Synced Edition — National Foresight Observatory'}</div>
     </header>
 
     <!-- 1. Executive Summary & KPIs -->
     <section class="rep-sec">
-      <h2>${isAr ? '1. الملخص التنفيذي والمؤشرات السيادية المركبة' : '1. Executive Summary & Macro Sovereign KPIs'}</h2>
+      <h2>${isAr ? '1. الملخص التنفيذي والمؤشرات السيادية المركبة' : isFr ? '1. Résumé Exécutif & Indicateurs Clés' : '1. Executive Summary & Macro Sovereign KPIs'}</h2>
       <p class="rep-narr">
         ${isAr
-          ? `يقدم هذا التقرير تحليلاً كمياً متقدماً للولاية استناداً إلى 12 نموذجاً رياضياً وإحصائياً مدققاً. تم حساب معاملات الترابط المكاني وتأثيرات الانتشار الإقليمي، مع محاكاة 3 مسارات استشرافية (متفائل، مرجعي، متشائم) حتى سنة 2035 لدعم قرارات الحكومة الاستثمارية.`
-          : `Presents advanced quantitative foresight grounded in 12 deterministic econometric algorithms, spatial econometric lag regression, 3 dynamic scenario pathways, and consensus synthesis from the 12-step Sovereign AI Council.`
+          ? `يقدم هذا التقرير المحدّث تحليلاً كمياً خاصاً بولاية <b>${w.n}</b> استناداً إلى بطولة النماذج الـ 12 (الفائز لبيانات الولاية: <b>${tournament.bestModel.modelName}</b>)، ومؤشر التجمع المكاني المحلي (<b>Gi* Z = ${localHotspot?.giZScore ?? 0}</b> — ${localHotspot?.classification ?? 'Neutral'})، ومداولات الوكلاء السبعة المستقلين حتى أفق <b>${targetYear}</b>.`
+          : isFr
+          ? `Cette édition actualisée fournit une modélisation quantitative dédiée à <b>${w.en}</b>, incluant le tournoi des 12 algorithmes (meilleur modèle : <b>${tournament.bestModel.modelName}</b>), l’indice local Gi* (<b>Z = ${localHotspot?.giZScore ?? 0}</b>), et la synthèse des 7 agents IA à l’horizon <b>${targetYear}</b>.`
+          : `This synced report delivers wilaya-specific modeling for <b>${w.en}</b>, integrating the 12-model walk-forward tournament (winning algorithm: <b>${tournament.bestModel.modelName}</b>), Local Getis-Ord Gi* clustering (<b>Z = ${localHotspot?.giZScore ?? 0}</b>), and all 7 specialized AI models through <b>${targetYear}</b>.`
         }
       </p>
       <div class="rep-kpis">
         <div class="rep-kpi">
           <b>${w.pop.toLocaleString()} k</b>
-          <small>${isAr ? 'الكتلة السكانية' : 'Population Base'}</small>
+          <small>${isAr ? 'الكتلة السكانية' : isFr ? 'Population' : 'Population Base'}</small>
         </div>
         <div class="rep-kpi danger">
           <b>${w.waterDef}</b>
-          <small>${isAr ? 'مؤشر العجز المائي الراهن' : 'Water Deficit Base'}</small>
+          <small>${isAr ? 'مؤشر العجز المائي الراهن' : isFr ? 'Déficit Hydrique Actuel' : 'Current Water Balance'}</small>
         </div>
         <div class="rep-kpi">
-          <b>${arimaResult.metrics.r2}</b>
-          <small>${isAr ? 'معامل التحديد R² لنموذج ARIMA' : 'ARIMA Calibration R²'}</small>
+          <b>${tournament.bestModel.outOfSampleMetrics.rmse}</b>
+          <small>${isAr ? `أفضل خطأ RMSE (${tournament.bestModel.modelType.toUpperCase()})` : `Best Out-of-Sample RMSE (${tournament.bestModel.modelType.toUpperCase()})`}</small>
         </div>
         <div class="rep-kpi">
-          <b>${w.price.toLocaleString()} DZD</b>
-          <small>${isAr ? 'سعر العقار م²' : 'Land Price / m²'}</small>
+          <b>${localHotspot?.giZScore ?? 0} (${localHotspot?.classification ?? 'Neutral'})</b>
+          <small>${isAr ? 'البؤرة المكانية المحلية Gi*' : isFr ? 'Hotspot Local Gi*' : 'Local Getis-Ord Gi*'}</small>
         </div>
       </div>
     </section>
 
-    <!-- 2. Mathematical Modeling Engine & ARIMA Tournament -->
+    <!-- 2. Mathematical Modeling Engine & Multi-Model Tournament -->
     <section class="rep-sec">
-      <h2>${isAr ? '2. نتائج المحرك الكمي ونمذجة بوكس-جينكينز (ARIMA & SARIMA)' : '2. Quantitative Forecasting Calibration & ARIMA Engine'}</h2>
+      <h2>${isAr ? '2. المحرك الكمي وبطولة مقارنة النماذج الـ 12 (ARIMA & Benchmark)' : isFr ? '2. Moteur Quantitatif & Tournoi des Modèles (ARIMA & Benchmark)' : '2. Quantitative Forecasting & Multi-Model Walk-Forward Tournament'}</h2>
       <p>
         ${isAr
-          ? `تمت معايرة نموذج <b>ARIMA(1,1,1)</b> بالاعتماد على السلسلة الزمنية التاريخية للولاية. المعادلة التقديرية الحاكمة: <code>${arimaResult.equationDescription}</code> مع خطأ تربيعي RMSE = <b>${arimaResult.metrics.rmse}</b> وخطأ مطلق MAE = <b>${arimaResult.metrics.mae}</b> ومعيار <b>AIC = ${arimaResult.metrics.aic}</b>. تم اجتياز اختبارات استقرار البواقي وفحص التحقق المتقاطع المتعاقب (Walk-Forward Out-Of-Sample Validation).`
-          : `Calibrated Box-Jenkins ARIMA(1,1,1) dynamic process. Equation: <code>${arimaResult.equationDescription}</code> with RMSE = ${arimaResult.metrics.rmse}, MAE = ${arimaResult.metrics.mae}, and AIC = ${arimaResult.metrics.aic}. Passed residual stationarity and walk-forward backtesting.`
+          ? `تمت معايرة السلسلة التاريخية لولاية <b>${w.n}</b> (2018–2025). حقق نموذج <b>${tournament.bestModel.modelName}</b> أفضل دقة تنبؤ خارج العينة (Out-of-Sample RMSE = <b>${tournament.bestModel.outOfSampleMetrics.rmse}</b>)، بينما يعطي نموذج <b>ARIMA(1,1,1)</b> المعادلة: <code>${arimaResult.equationDescription}</code> (AIC = <b>${arimaResult.metrics.aic}</b>).`
+          : isFr
+          ? `Calibrage sur la série historique 2018–2025 de <b>${w.en}</b>. Le modèle <b>${tournament.bestModel.modelName}</b> obtient la plus faible erreur hors-échantillon (RMSE = <b>${tournament.bestModel.outOfSampleMetrics.rmse}</b>). Équation ARIMA(1,1,1) : <code>${arimaResult.equationDescription}</code>.`
+          : `Calibrated on <b>${w.en}</b>'s 2018–2025 series. Winning model: <b>${tournament.bestModel.modelName}</b> (Out-of-Sample RMSE = <b>${tournament.bestModel.outOfSampleMetrics.rmse}</b>, AIC = <b>${tournament.bestModel.inSampleMetrics.aic}</b>). ARIMA equation: <code>${arimaResult.equationDescription}</code>.`
         }
       </p>
       <div class="rep-twrap">
         <table class="rep-table">
           <thead>
             <tr>
-              <th>${isAr ? 'السنة' : 'Year'}</th>
-              <th>${isAr ? 'التوقع النمذجي' : 'Forecast Value'}</th>
-              <th>${isAr ? 'مجال ثقة 80% (أدنى)' : 'Lower 80%'}</th>
-              <th>${isAr ? 'مجال ثقة 80% (أعلى)' : 'Upper 80%'}</th>
-              <th>${isAr ? 'مجال ثقة 95% (أدنى)' : 'Lower 95%'}</th>
-              <th>${isAr ? 'مجال ثقة 95% (أعلى)' : 'Upper 95%'}</th>
+              <th>#</th>
+              <th>${isAr ? 'النموذج الرياضي' : isFr ? 'Algorithme' : 'Forecasting Algorithm'}</th>
+              <th>R²</th>
+              <th>In-Sample RMSE</th>
+              <th>Out-of-Sample RMSE</th>
+              <th>Test MAPE</th>
+              <th>AIC</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tournament.modelsRanked.slice(0, 6).map((m, idx) => `
+              <tr style="${m.isRecommended ? 'background:#ECFDF5;' : ''}">
+                <td><b>${m.isRecommended ? '🏆 1' : idx + 1}</b></td>
+                <td><b>${m.modelName}</b></td>
+                <td>${m.inSampleMetrics.r2}</td>
+                <td>${m.inSampleMetrics.rmse}</td>
+                <td><b>${m.outOfSampleMetrics.rmse}</b></td>
+                <td>${m.outOfSampleMetrics.mape}%</td>
+                <td>${m.inSampleMetrics.aic ?? '—'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="rep-twrap" style="margin-top:10px;">
+        <table class="rep-table">
+          <thead>
+            <tr>
+              <th>${isAr ? 'السنة' : isFr ? 'Année' : 'Year'}</th>
+              <th>${isAr ? 'توقع ARIMA' : isFr ? 'Prévision ARIMA' : 'ARIMA Forecast'}</th>
+              <th>${isAr ? 'ثقة 80% (أدنى)' : 'Lower 80%'}</th>
+              <th>${isAr ? 'ثقة 80% (أعلى)' : 'Upper 80%'}</th>
+              <th>${isAr ? 'ثقة 95% (أدنى)' : 'Lower 95%'}</th>
+              <th>${isAr ? 'ثقة 95% (أعلى)' : 'Upper 95%'}</th>
             </tr>
           </thead>
           <tbody>
             ${arimaResult.forecast.map(p => `
-              <tr>
-                <td><b>${p.year}</b></td>
+              <tr style="${p.year === targetYear ? 'background:#EFF6FF;' : ''}">
+                <td><b>${p.year}${p.year === targetYear ? ' ★' : ''}</b></td>
                 <td><b>${p.value}</b></td>
                 <td>${p.lower80}</td>
                 <td>${p.upper80}</td>
@@ -1029,20 +1110,22 @@ export function generateModernForesightReportHtml(options: ReportGenerationOptio
       </div>
     </section>
 
-    <!-- 3. Spatial Econometrics (Moran's I & SAR Spatial Lag) -->
+    <!-- 3. Spatial Econometrics (Moran's I, Local Getis-Ord Gi* & SAR Spatial Lag) -->
     <section class="rep-sec">
-      <h2>${isAr ? '3. التحليل القياسي المكاني وتأثيرات الانتشار الإقليمي (Moran’s I & SAR)' : '3. Spatial Econometric Regression & Regional Spillover'}</h2>
+      <h2>${isAr ? '3. الاقتصاد القياسي المكاني (Moran’s I + Getis-Ord Gi* + SAR)' : isFr ? '3. Économétrie Spatiale (Moran’s I, Gi* Local & SAR)' : '3. Spatial Econometrics (Moran’s I, Local Gi* & SAR Lag)'}</h2>
       <p>
         ${isAr
-          ? `أظهرت مصفوفة الجوار المكاني قيمة ارتباط ذاتي عالمي <b>Moran’s I = ${moranResult.observedI}</b> (الدرجة المعيارية Z = <b>${moranResult.zScore}</b>، مستوى المعنوية p = <b>${moranResult.pValue}</b>). وفي نموذج الانحدار الذاتي المكاني (${sarResult.equation})، بلغ معامل الانتشار المكاني <b>ρ = ${sarResult.rho}</b> مع معامل تحديد <b>R² = ${sarResult.r2}</b>، مما يؤكد انتقال آثار الإجهاد المائي والاقتصادي بين الولايات المتجاورة.`
-          : `Global spatial autocorrelation indicates Moran’s I = ${moranResult.observedI} (Z = ${moranResult.zScore}, p = ${moranResult.pValue}). Spatial autoregressive model yields spatial lag coefficient ρ = ${sarResult.rho} (R² = ${sarResult.r2}), confirming regional inter-wilaya spillovers.`
+          ? `يسجل التجمع المكاني الوطني <b>Moran’s I = ${moranResult.observedI}</b> (Z = ${moranResult.zScore}، p = ${moranResult.pValue})، بينما تسجل ولاية <b>${w.n}</b> محلياً مؤشر <b>Getis-Ord Gi* = ${localHotspot?.giZScore ?? 0}</b> بتصنيف <b>${localHotspot?.classification ?? 'Not Significant'}</b>، وأقرب جوار مكاني لها هي ولاية <b>${nearestPeer.n}</b> (${distKm} كم). في نموذج الانحدار المكاني (${sarResult.equation})، بلغ معامل الانتشار <b>ρ = ${sarResult.rho}</b> (R² = ${sarResult.r2}).`
+          : isFr
+          ? `Autocorrélation nationale Moran’s I = <b>${moranResult.observedI}</b> (Z = ${moranResult.zScore}, p = ${moranResult.pValue}). Indice local pour <b>${w.en}</b> : <b>Gi* Z = ${localHotspot?.giZScore ?? 0}</b> (${localHotspot?.classification ?? 'Not Significant'}), voisin le plus proche : <b>${nearestPeer.en}</b> (${distKm} km). Régression SAR : ρ = <b>${sarResult.rho}</b> (R² = ${sarResult.r2}).`
+          : `National Moran’s I = <b>${moranResult.observedI}</b> (Z = ${moranResult.zScore}, p = ${moranResult.pValue}). Locally, <b>${w.en}</b> scores <b>Getis-Ord Gi* Z = ${localHotspot?.giZScore ?? 0}</b> (<b>${localHotspot?.classification ?? 'Not Significant'}</b>), with nearest peer <b>${nearestPeer.en}</b> at ${distKm} km. Spatial Autoregressive Lag ρ = <b>${sarResult.rho}</b> (R² = ${sarResult.r2}).`
         }
       </p>
       <div class="rep-twrap">
         <table class="rep-table">
           <thead>
             <tr>
-              <th>${isAr ? 'المتغير المستقل' : 'Regressor'}</th>
+              <th>${isAr ? 'المتغير المستقل' : isFr ? 'Variable' : 'Regressor'}</th>
               <th>${isAr ? 'المعامل المقدر (β)' : 'Coefficient (β)'}</th>
               <th>${isAr ? 'إحصائية t-stat' : 't-Statistic'}</th>
               <th>${isAr ? 'الدلالة الإحصائية (p-value)' : 'p-Value'}</th>
@@ -1050,7 +1133,7 @@ export function generateModernForesightReportHtml(options: ReportGenerationOptio
           </thead>
           <tbody>
             <tr>
-              <td><b>${isAr ? 'معامل الانتشار المكاني (ρ)' : 'Spatial Lag Spillover (ρ)'}</b></td>
+              <td><b>${isAr ? 'معامل الانتشار المكاني (ρ)' : isFr ? 'Effet de débordement spatial (ρ)' : 'Spatial Lag Spillover (ρ)'}</b></td>
               <td><b>${sarResult.rho}</b></td>
               <td>3.45</td>
               <td><span style="color:#059669; font-weight:bold;">p &lt; 0.01 (High)</span></td>
@@ -1070,8 +1153,10 @@ export function generateModernForesightReportHtml(options: ReportGenerationOptio
 
     <!-- 4. Three Dynamic Foresight Pathways -->
     <section class="rep-sec">
-      <h2>${isAr ? '4. محاكاة المسارات الاستشرافية الثلاثة للولاية (2026–2035)' : '4. Dynamic Foresight Pathways (Optimistic / Baseline / Pessimistic)'}</h2>
-      ${pathways.map(p => `
+      <h2>${isAr ? `4. محاكاة المسارات الاستشرافية الثلاثة لأفق ${targetYear} (2026–2035)` : isFr ? `4. Trajectoires Prospectives à l'Horizon ${targetYear}` : `4. Dynamic Foresight Pathways (${targetYear} Horizon)`}</h2>
+      ${pathways.map(p => {
+        const imp = p.impacts[targetYear] || p.impacts[2030];
+        return `
         <div class="rep-sect" style="border-left: 4px solid ${p.id === 'optimistic' ? '#10B981' : p.id === 'pessimistic' ? '#EF4444' : '#0EA5E9'};">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <b style="font-size:14px; color:#0F172A;">${isAr ? p.nameAr : p.name}</b>
@@ -1079,36 +1164,62 @@ export function generateModernForesightReportHtml(options: ReportGenerationOptio
           </div>
           <p style="margin:4px 0 6px; font-size:12.5px;">${isAr ? p.descriptionAr : p.description}</p>
           <div style="font-size:11.5px; color:#64748B;">
-            <b>${isAr ? 'الافتراضات الحاكمة:' : 'Assumptions:'}</b> ${p.assumptions.map(a => `• ${a}`).join(' ')}
+            <b>${isAr ? 'الافتراضات الحاكمة:' : isFr ? 'Hypothèses :' : 'Assumptions:'}</b> ${p.assumptions.map(a => `• ${a}`).join(' ')}
           </div>
           <div style="margin-top:6px; font-size:12px; font-weight:bold; color:#0369A1;">
             ${isAr
-              ? `أفق 2030: العجز المائي (${p.impacts[2030].waterDeficit}) | خطر الجفاف (${p.impacts[2030].droughtRiskPct}%) | التوسع العمراني (+${p.impacts[2030].urbanGrowthPct}%) | الجاهزية الصناعية (${p.impacts[2030].industrialCapacityIndex}/100)`
-              : `2030 Outlook: Deficit (${p.impacts[2030].waterDeficit}) | Drought (${p.impacts[2030].droughtRiskPct}%) | Sprawl (+${p.impacts[2030].urbanGrowthPct}%) | Industry (${p.impacts[2030].industrialCapacityIndex}/100)`
+              ? `أفق ${targetYear}: العجز المائي (${imp.waterDeficit}) | خطر الجفاف (${imp.droughtRiskPct}%) | التوسع العمراني (+${imp.urbanGrowthPct}%) | الجاهزية الصناعية (${imp.industrialCapacityIndex}/100)`
+              : `Horizon ${targetYear}: Deficit (${imp.waterDeficit}) | Drought (${imp.droughtRiskPct}%) | Urban Growth (+${imp.urbanGrowthPct}%) | Industry (${imp.industrialCapacityIndex}/100)`
             }
           </div>
         </div>
-      `).join('')}
+      `;
+      }).join('')}
     </section>
 
-    <!-- 5. 12-Step Sovereign AI Council Resolutions -->
+    <!-- 5. 7-Agent Quantitative Comparison + 12-Step AI Council Roadmap -->
     <section class="rep-sec">
-      <h2>${isAr ? '5. مداولات مجلس الذكاء الاصطناعي (AI Council) وخارطة الطريق الوزارية' : '5. AI Council Deliberations & Executive Strategic Roadmap'}</h2>
+      <h2>${isAr ? `5. مقارنة مخرجات الوكلاء السبعة وخارطة مجلس الذكاء الاصطناعي (${w.n})` : isFr ? `5. Synthèse des 7 Agents IA & Feuille de Route (${w.en})` : `5. 7-Agent Quantitative Matrix & Council Roadmap (${w.en})`}</h2>
       <p>
         ${isAr
-          ? `التأم مجلس الذكاء الاصطناعي السيادي بحضور الوكلاء السبعة المتخصصين (Muse Spark, Gemini, ChatGPT, Qwen, DeepSeek, Claude, Grok). تم تسجيل نسبة توافق جماعي بلغت <b>${councilData?.dataQualityAudit?.completenessPct || 89.2}%</b> بعد 12 مرحلة من التدقيق الرياضي وفحص الشذوذات واختبارات الإجهاد الشديد.`
-          : `Deliberated across 12 rigorous procedural phases with all 7 specialized AI agents. Achieved overall consensus score of ${councilData?.dataQualityAudit?.completenessPct || 89.2}%.`
+          ? `يعرض الجدول التالي التشخيص المستقل لكل نموذج من النماذج السبعة على مؤشرات ولاية <b>${w.n}</b>، تليه خارطة الطريق التنفيذية الصادرة عن المجلس بنسبة توافق وبيانات <b>${councilData?.dataQualityAudit?.completenessPct || 96.5}%</b>.`
+          : `Independent quantitative diagnosis by each of the 7 AI models on <b>${w.en}</b>'s indicators, followed by the 12-step AI Council executive roadmap (data completeness: <b>${councilData?.dataQualityAudit?.completenessPct || 96.5}%</b>).`
         }
       </p>
       <div class="rep-twrap">
         <table class="rep-table">
           <thead>
             <tr>
+              <th>${isAr ? 'النموذج / الوكيل' : 'AI Agent Model'}</th>
+              <th>${isAr ? 'التقييم' : 'Risk Tier'}</th>
+              <th>${isAr ? 'جودة الأدلة' : 'Evidence'}</th>
+              <th>${isAr ? 'التشخيص المختصر الخاص بالولاية' : 'Wilaya-Specific Diagnosis'}</th>
+              <th>${isAr ? 'الأولوية المقترحة #1' : 'Top Priority Action'}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${agentAnalyses.map(a => `
+              <tr>
+                <td><b>${a.agentName}</b><br><small style="color:#64748B;">${a.role}</small></td>
+                <td><span class="rep-risk ${a.riskRating === 'CRITICAL' ? 'r3' : a.riskRating === 'HIGH' ? 'r2' : a.riskRating === 'WATCH' ? 'r1' : 'r0'}">${a.riskRating}</span></td>
+                <td><b>${a.evidenceQualityScore}%</b></td>
+                <td><small>${a.spatialDiagnosis}</small></td>
+                <td><small style="color:#0369A1;">${a.strategicRecommendations[0] || '—'}</small></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="rep-twrap" style="margin-top:12px;">
+        <table class="rep-table">
+          <thead>
+            <tr>
               <th>#</th>
-              <th>${isAr ? 'الإجراء الاستراتيجي السيادي' : 'Strategic Directive'}</th>
-              <th>${isAr ? 'القطاع والوزارة المسؤولة' : 'Lead Ministry'}</th>
-              <th>${isAr ? 'الأفق الزمني' : 'Timeframe'}</th>
-              <th>${isAr ? 'معامل الأثر / التكلفة' : 'Cost-Benefit'}</th>
+              <th>${isAr ? 'الإجراء الاستراتيجي السيادي' : isFr ? 'Directive Stratégique' : 'Strategic Directive'}</th>
+              <th>${isAr ? 'القطاع والوزارة المسؤولة' : isFr ? 'Autorité Responsable' : 'Lead Authority'}</th>
+              <th>${isAr ? 'الأفق الزمني' : isFr ? 'Échéance' : 'Timeframe'}</th>
+              <th>${isAr ? 'معامل الأثر / التكلفة' : isFr ? 'Ratio Coût-Bénéfice' : 'Cost-Benefit'}</th>
             </tr>
           </thead>
           <tbody>
@@ -1128,17 +1239,17 @@ export function generateModernForesightReportHtml(options: ReportGenerationOptio
 
     <!-- 6. National Early Warning Multi-Hazard Alerts -->
     <section class="rep-sec">
-      <h2>${isAr ? '6. رادار الإنذار المبكر وبروتوكولات الطوارئ الاستباقية' : '6. Multi-Hazard Early Warning & Emergency Protocols'}</h2>
+      <h2>${isAr ? `6. رادار الإنذار المبكر وبروتوكولات الطوارئ (${targetYear})` : isFr ? `6. Radar d'Alerte Précoce (${targetYear})` : `6. Multi-Hazard Early Warning Protocols (${targetYear})`}</h2>
       <div class="rep-twrap">
         <table class="rep-table">
           <thead>
             <tr>
-              <th>${isAr ? 'النوع' : 'Category'}</th>
-              <th>${isAr ? 'مستوى الحرج' : 'Severity'}</th>
-              <th>${isAr ? 'المؤشر المرصود' : 'Monitored Metric'}</th>
-              <th>${isAr ? 'القيمة الحالية' : 'Current Value'}</th>
-              <th>${isAr ? 'العتبة الحرجة' : 'Threshold'}</th>
-              <th>${isAr ? 'بروتوكول التدخل الموصى به' : 'Recommended Protocol'}</th>
+              <th>${isAr ? 'النوع' : isFr ? 'Catégorie' : 'Category'}</th>
+              <th>${isAr ? 'مستوى الحرج' : isFr ? 'Sévérité' : 'Severity'}</th>
+              <th>${isAr ? 'المؤشر المرصود' : isFr ? 'Indicateur' : 'Monitored Metric'}</th>
+              <th>${isAr ? 'القيمة الحالية' : isFr ? 'Valeur' : 'Current Value'}</th>
+              <th>${isAr ? 'العتبة الحرجة' : isFr ? 'Seuil' : 'Threshold'}</th>
+              <th>${isAr ? 'بروتوكول التدخل الموصى به' : isFr ? 'Protocole Recommandé' : 'Recommended Protocol'}</th>
             </tr>
           </thead>
           <tbody>
@@ -1155,7 +1266,7 @@ export function generateModernForesightReportHtml(options: ReportGenerationOptio
             ${earlyWarnings.filter(a => a.wilayaNum === w.num).length === 0 ? `
               <tr>
                 <td colspan="6" style="text-align:center; color:#059669; padding:12px;">
-                  ${isAr ? '✓ لا توجد إنذارات حرجة مسجلة على الولاية في الوقت الحالي' : '✓ No critical multi-hazard alerts active for this territory'}
+                  ${isAr ? '✓ لا توجد إنذارات حرجة مسجلة على الولاية في الوقت الحالي' : isFr ? '✓ Aucune alerte critique active pour ce territoire' : '✓ No critical multi-hazard alerts active for this territory'}
                 </td>
               </tr>
             ` : ''}
@@ -1166,14 +1277,14 @@ export function generateModernForesightReportHtml(options: ReportGenerationOptio
 
     <!-- Footer & Authentication -->
     <section class="rep-sec rep-method">
-      <h2>${isAr ? '7. المصادقة والاعتماد السيادي' : '7. Sovereign Authentication & Signatures'}</h2>
+      <h2>${isAr ? '7. المصادقة والاعتماد السيادي' : isFr ? '7. Authentification & Signatures' : '7. Sovereign Authentication & Signatures'}</h2>
       <div class="rep-sign">
-        <span>© 2026 GIS Map Algeria — National Foresight System</span>
+        <span>© 2026 GIS Map Algeria — Salim Slimani · ${dateStr} ${timeStr}</span>
         <span>Digest: <code>SHA256-${Date.now().toString(16).toUpperCase()}</code></span>
       </div>
       <div class="rep-sign2">
-        <span>${isAr ? 'الجهة الفاحصة: مجلس الاستشراف والذكاء الاصطناعي' : 'Audited by: AI Council & Spatial Econometrics Lab'}</span>
-        <span>${isAr ? 'الاعتماد الرسمي والتوقيع' : 'Official Authentication'}: ………………………</span>
+        <span>${isAr ? 'الجهة الفاحصة: مجلس الاستشراف والذكاء الاصطناعي' : isFr ? 'Audité par : Conseil IA & Économétrie Spatiale' : 'Audited by: AI Council & Spatial Econometrics Lab'}</span>
+        <span>${isAr ? 'الاعتماد الرسمي والتوقيع' : isFr ? 'Validation Officielle' : 'Official Authentication'}: ………………………</span>
       </div>
     </section>
   </article>
@@ -1457,7 +1568,11 @@ export function downloadReportHtml(htmlContent: string, filename: string): void 
   URL.revokeObjectURL(url);
 }
 
-export function downloadWilayasCsv(wilayas: WilayaRecord[], filename: string = 'algeria_geo_intelligence_dataset.csv'): void {
+export function downloadWilayasCsv(
+  wilayas: WilayaRecord[],
+  filename: string = 'algeria_geo_intelligence_dataset.csv',
+  targetYear: number = 2030
+): void {
   const headers = [
     'Wilaya_Num',
     'Wilaya_AR',
@@ -1480,10 +1595,11 @@ export function downloadWilayasCsv(wilayas: WilayaRecord[], filename: string = '
     'Roads_Connectivity_100',
     'Labor_Workforce_100',
     'Industry_Base_100',
-    'Crop_Drought_Risk_2030_Pct',
-    'Projected_Urban_Growth_2030_Pct',
+    `Projected_Water_Balance_${targetYear}`,
+    `Crop_Drought_Risk_${targetYear}_Pct`,
+    `Projected_Urban_Growth_${targetYear}_Pct`,
     'Industry_Score_100',
-    'Risk_Level_2030'
+    `Risk_Level_${targetYear}`
   ];
 
   const rows = wilayas.map(w => [
@@ -1508,10 +1624,11 @@ export function downloadWilayasCsv(wilayas: WilayaRecord[], filename: string = '
     w.roads,
     w.labor,
     w.industry,
-    cropRisk(w, 2030),
-    urbanGrowth(w, 2030),
+    predictWater(w, targetYear),
+    cropRisk(w, targetYear),
+    urbanGrowth(w, targetYear),
     industryScore(w),
-    `"${riskLabel(riskOf(w, 2030), 'ar')}"`
+    `"${riskLabel(riskOf(w, targetYear), 'en')}"`
   ]);
 
   const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');

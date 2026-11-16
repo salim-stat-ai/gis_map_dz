@@ -105,6 +105,8 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
 
   const [currentBasemap, setCurrentBasemap] = useState<BasemapKey>('osm');
   const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const [chartMetric, setChartMetric] = useState<'waterDef' | 'rain' | 'price' | 'pop'>('waterDef');
+  const [showRadarBenchmark, setShowRadarBenchmark] = useState<boolean>(true);
 
   const [activeLayers, setActiveLayers] = useState<Record<string, boolean>>({
     realestate: true,
@@ -263,95 +265,273 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
     }
   }, [selectedWilaya]);
 
-  // Draw Charts
+  // Draw Interactive Charts (Trajectory + National-Benchmarked Radar)
   useEffect(() => {
     if (!selectedWilaya) return;
 
-    // 1. Water forecast chart
+    // 1. Multi-Metric Historical + Projected Forecast Chart (2020–2035)
     if (chartWaterRef.current) {
       if (chartWaterInstance.current) chartWaterInstance.current.destroy();
 
-      const years = [2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035];
-      const forecastVals = years.map(y => {
-        const h = y - 2026;
-        return Math.round(selectedWilaya.waterDef * 10 - (selectedWilaya.pop * 0.035 * h) * 0.15 - (selectedWilaya.rain * 0.012 * h) * 0.2);
-      });
+      const ctx = chartWaterRef.current.getContext('2d');
+      const histYears = (selectedWilaya.historicalYears ?? [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]).slice(-4); // 2022-2025
+      const projYears = [2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035];
+      const allYears = [...histYears, ...projYears];
+
+      const getHistSeries = () => {
+        if (chartMetric === 'rain') return (selectedWilaya.historicalRain ?? Array(8).fill(selectedWilaya.rain)).slice(-4).map(v => Math.round(v));
+        if (chartMetric === 'price') return (selectedWilaya.historicalPrice ?? Array(8).fill(selectedWilaya.price)).slice(-4).map(v => Math.round(v));
+        if (chartMetric === 'pop') return (selectedWilaya.historicalPop ?? Array(8).fill(selectedWilaya.pop)).slice(-4).map(v => Math.round(v));
+        return (selectedWilaya.historicalWaterDef ?? Array(8).fill(selectedWilaya.waterDef)).slice(-4).map(v => Math.round(v * 10));
+      };
+
+      const getProjValue = (y: number) => {
+        const h = y - 2025;
+        if (chartMetric === 'rain') {
+          return Math.max(10, Math.round(selectedWilaya.rain * Math.pow(0.989, h)));
+        }
+        if (chartMetric === 'price') {
+          return Math.round(selectedWilaya.price * Math.pow(1.028 + (selectedWilaya.industry / 100) * 0.012, h));
+        }
+        if (chartMetric === 'pop') {
+          return Math.round(selectedWilaya.pop * Math.pow(selectedWilaya.region === 'Sahara' ? 1.019 : 1.015, h));
+        }
+        return Math.round(
+          selectedWilaya.waterDef * 10 - (selectedWilaya.pop * 0.035 * Math.max(0, y - 2026)) * 0.15 - (selectedWilaya.rain * 0.012 * Math.max(0, y - 2026)) * 0.2
+        );
+      };
+
+      const histVals = getHistSeries();
+      const projVals = projYears.map(getProjValue);
+
+      const histDataset = [...histVals, ...projYears.map(() => null)];
+      const projDataset: (number | null)[] = histVals.map((_, idx) => (idx === histVals.length - 1 ? histVals[histVals.length - 1] : null));
+      projDataset.push(...projVals);
+
+      const metricPalette: Record<typeof chartMetric, { line: string; fillTop: string; unit: string }> = {
+        waterDef: { line: '#38BDF8', fillTop: 'rgba(56, 189, 248, 0.35)', unit: '' },
+        rain: { line: '#10B981', fillTop: 'rgba(16, 185, 129, 0.35)', unit: ' mm' },
+        price: { line: '#F59E0B', fillTop: 'rgba(245, 158, 11, 0.35)', unit: ' DZD' },
+        pop: { line: '#A78BFA', fillTop: 'rgba(167, 139, 250, 0.35)', unit: 'k' }
+      };
+      const pal = metricPalette[chartMetric];
+
+      let gradient: CanvasGradient | string = pal.fillTop;
+      if (ctx) {
+        const g = ctx.createLinearGradient(0, 0, 0, 175);
+        g.addColorStop(0, pal.fillTop);
+        g.addColorStop(1, 'rgba(8, 16, 32, 0.0)');
+        gradient = g;
+      }
+
+      const pointRadii = allYears.map(y => (y === targetYear ? 6 : 2.5));
+      const pointColors = allYears.map(y => (y === targetYear ? '#FBBF24' : pal.line));
+      const pointBorders = allYears.map(y => (y === targetYear ? '#FFFFFF' : pal.line));
 
       chartWaterInstance.current = new ChartJS(chartWaterRef.current, {
         type: 'line',
         data: {
-          labels: years,
+          labels: allYears,
           datasets: [
             {
-              label: isAr ? `العجز المائي المتوقع (${selectedWilaya.n})` : `Water Deficit Forecast (${selectedWilaya.en})`,
-              data: forecastVals,
-              borderColor: '#0EA5E9',
-              backgroundColor: 'rgba(14, 165, 233, 0.15)',
+              label: isAr ? 'التاريخي (2022–2025)' : 'Observed (2022–2025)',
+              data: histDataset,
+              borderColor: '#94A3B8',
+              backgroundColor: 'transparent',
+              borderWidth: 2,
+              pointRadius: 3,
+              pointBackgroundColor: '#CBD5E1',
+              tension: 0.3
+            },
+            {
+              label: isAr ? 'التوقع (2026–2035)' : 'Forecast (2026–2035)',
+              data: projDataset,
+              borderColor: pal.line,
+              backgroundColor: gradient,
               fill: true,
-              tension: 0.3,
-              pointBackgroundColor: '#0284C7',
-              pointRadius: 3
+              borderWidth: 2.5,
+              borderDash: [4, 3],
+              tension: 0.35,
+              pointRadius: pointRadii,
+              pointHoverRadius: 7,
+              pointBackgroundColor: pointColors,
+              pointBorderColor: pointBorders,
+              pointBorderWidth: 1.5
             }
           ]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
           plugins: {
-            legend: { labels: { color: '#CBD5E1', font: { size: 11 } } }
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: 'rgba(7, 13, 27, 0.95)',
+              titleColor: '#F8FAFC',
+              bodyColor: '#CBD5E1',
+              borderColor: 'rgba(255,255,255,0.15)',
+              borderWidth: 1,
+              padding: 10,
+              displayColors: true,
+              callbacks: {
+                title: (items) => {
+                  const yr = Number(items[0]?.label);
+                  const suffix = yr === targetYear ? (isAr ? ' ★ السنة المستهدفة' : ' ★ Target Horizon') : '';
+                  return `${isAr ? selectedWilaya.n : selectedWilaya.en} — ${yr}${suffix}`;
+                },
+                label: (ctxItem) => {
+                  if (ctxItem.parsed.y === null || ctxItem.parsed.y === undefined) return '';
+                  const val = ctxItem.parsed.y;
+                  const formatted = chartMetric === 'price' ? val.toLocaleString() : val;
+                  return ` ${ctxItem.dataset.label}: ${formatted}${pal.unit}`;
+                }
+              }
+            }
           },
           scales: {
-            x: { ticks: { color: '#94A3B8', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
-            y: { ticks: { color: '#94A3B8', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } }
+            x: {
+              ticks: {
+                color: (c) => (Number(allYears[c.index]) === targetYear ? '#FBBF24' : '#94A3B8'),
+                font: (c) => ({ size: 10, weight: Number(allYears[c.index]) === targetYear ? 'bold' : 'normal' }),
+                maxRotation: 0,
+                autoSkip: true,
+                maxTicksLimit: 7
+              },
+              grid: { color: 'rgba(255,255,255,0.04)' }
+            },
+            y: {
+              ticks: {
+                color: '#94A3B8',
+                font: { size: 10 },
+                maxTicksLimit: 5,
+                callback: (val) => {
+                  const n = Number(val);
+                  if (chartMetric === 'price') return `${Math.round(n / 1000)}k`;
+                  return `\u200E${n}`; // force LTR sign placement in RTL mode
+                }
+              },
+              grid: { color: 'rgba(255,255,255,0.06)' }
+            }
           }
         }
       });
     }
 
-    // 2. Multi-sector Radar chart
+    // 2. Multi-Sector Radar Chart with National Mean Benchmark Overlay
     if (chartRadarRef.current) {
       if (chartRadarInstance.current) chartRadarInstance.current.destroy();
 
       const radarLabels = isAr
-        ? ['التربة', 'الأمطار/10', 'NDVI ×100', 'الطاقة', 'الطرق', 'التغطية']
-        : ['Soil', 'Rain/10', 'NDVI x100', 'Energy', 'Roads', 'Coverage'];
+        ? ['التربة', 'الأمطار', 'NDVI', 'الطاقة', 'الطرق', 'التغطية']
+        : ['Soil', 'Rain', 'NDVI', 'Energy', 'Roads', 'Coverage'];
+
+      const clamp100 = (v: number) => Math.max(0, Math.min(100, Math.round(v)));
 
       const radarData = [
-        selectedWilaya.soil,
-        selectedWilaya.rain / 10,
-        selectedWilaya.ndvi * 100,
-        selectedWilaya.energy,
-        selectedWilaya.roads,
-        selectedWilaya.coverage
+        clamp100(selectedWilaya.soil),
+        clamp100(selectedWilaya.rain / 10),
+        clamp100(selectedWilaya.ndvi * 100),
+        clamp100(selectedWilaya.energy),
+        clamp100(selectedWilaya.roads),
+        clamp100(selectedWilaya.coverage)
       ];
+
+      const nCount = Math.max(1, wilayas.length);
+      const natAvgData = [
+        clamp100(wilayas.reduce((s, x) => s + x.soil, 0) / nCount),
+        clamp100(wilayas.reduce((s, x) => s + x.rain / 10, 0) / nCount),
+        clamp100(wilayas.reduce((s, x) => s + x.ndvi * 100, 0) / nCount),
+        clamp100(wilayas.reduce((s, x) => s + x.energy, 0) / nCount),
+        clamp100(wilayas.reduce((s, x) => s + x.roads, 0) / nCount),
+        clamp100(wilayas.reduce((s, x) => s + x.coverage, 0) / nCount)
+      ];
+
+      const rawFormats = [
+        (v: number) => `${v}/100`,
+        (v: number) => `${v * 10} mm`,
+        (v: number) => `${(v / 100).toFixed(2)}`,
+        (v: number) => `${v}%`,
+        (v: number) => `${v}%`,
+        (v: number) => `${v}%`
+      ];
+
+      const datasets: any[] = [
+        {
+          label: isAr ? selectedWilaya.n : selectedWilaya.en,
+          data: radarData,
+          borderColor: '#F59E0B',
+          backgroundColor: 'rgba(245, 158, 11, 0.24)',
+          borderWidth: 2.5,
+          pointBackgroundColor: '#FBBF24',
+          pointBorderColor: '#081020',
+          pointBorderWidth: 1.5,
+          pointRadius: 4,
+          pointHoverRadius: 6
+        }
+      ];
+
+      if (showRadarBenchmark) {
+        datasets.push({
+          label: isAr ? 'المتوسط الوطني' : 'National Mean',
+          data: natAvgData,
+          borderColor: '#38BDF8',
+          backgroundColor: 'rgba(56, 189, 248, 0.08)',
+          borderWidth: 1.8,
+          borderDash: [4, 3],
+          pointBackgroundColor: '#38BDF8',
+          pointRadius: 2.5,
+          pointHoverRadius: 4
+        });
+      }
 
       chartRadarInstance.current = new ChartJS(chartRadarRef.current, {
         type: 'radar',
         data: {
           labels: radarLabels,
-          datasets: [
-            {
-              label: isAr ? selectedWilaya.n : selectedWilaya.en,
-              data: radarData,
-              borderColor: '#F59E0B',
-              backgroundColor: 'rgba(245, 158, 11, 0.25)',
-              pointBackgroundColor: '#F59E0B',
-              pointRadius: 3
-            }
-          ]
+          datasets
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          layout: { padding: { top: 4, bottom: 4, left: 6, right: 6 } },
           plugins: {
-            legend: { labels: { color: '#CBD5E1', font: { size: 11 } } }
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: 'rgba(7, 13, 27, 0.95)',
+              titleColor: '#F8FAFC',
+              bodyColor: '#CBD5E1',
+              borderColor: 'rgba(255,255,255,0.15)',
+              borderWidth: 1,
+              padding: 9,
+              callbacks: {
+                label: (ctxItem) => {
+                  const idx = ctxItem.dataIndex;
+                  const val = Math.round(ctxItem.parsed.r);
+                  const fmt = rawFormats[idx] ? rawFormats[idx](val) : `${val}`;
+                  return ` ${ctxItem.dataset.label}: ${fmt}`;
+                }
+              }
+            }
           },
           scales: {
             r: {
+              min: 0,
+              max: 100,
               angleLines: { color: 'rgba(255,255,255,0.1)' },
-              grid: { color: 'rgba(255,255,255,0.1)' },
-              pointLabels: { color: '#CBD5E1', font: { size: 10 } },
-              ticks: { display: false }
+              grid: { color: 'rgba(255,255,255,0.09)', circular: true },
+              pointLabels: {
+                color: '#E2E8F0',
+                font: { size: 11, weight: 'bold' },
+                padding: 6
+              },
+              ticks: {
+                stepSize: 50,
+                display: true,
+                backdropColor: 'transparent',
+                color: 'rgba(148, 163, 184, 0.55)',
+                font: { size: 8 }
+              }
             }
           }
         }
@@ -362,7 +542,7 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
       if (chartWaterInstance.current) chartWaterInstance.current.destroy();
       if (chartRadarInstance.current) chartRadarInstance.current.destroy();
     };
-  }, [selectedWilaya, isAr]);
+  }, [selectedWilaya, wilayas, targetYear, chartMetric, showRadarBenchmark, isAr]);
 
   // Aggregate National KPIs
   const horizon = targetYear - 2026;
@@ -641,26 +821,113 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
             </div>
           </div>
 
-          {/* Charts Container */}
+          {/* Upgraded Interactive Charts Container */}
           <div className="space-y-3 pt-1">
-            <div className="h-32 w-full bg-[#081020] p-1.5 rounded-lg border border-white/5">
-              <canvas ref={chartWaterRef} />
+            {/* Card 1: Interactive Forecast Line Chart */}
+            <div className="bg-[#081020] p-3 rounded-xl border border-white/10 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="w-2 h-2 rounded-full bg-sky-400 shrink-0" />
+                  <span className="text-[11px] font-bold text-slate-200 truncate">
+                    {chartMetric === 'waterDef'
+                      ? isAr ? `العجز المائي (${selectedWilaya.n})` : `Water Trajectory (${selectedWilaya.en})`
+                      : chartMetric === 'rain'
+                      ? isAr ? `التساقط (${selectedWilaya.n})` : `Rainfall mm (${selectedWilaya.en})`
+                      : chartMetric === 'price'
+                      ? isAr ? `العقار دج/م² (${selectedWilaya.n})` : `Land Price (${selectedWilaya.en})`
+                      : isAr ? `السكان ألف (${selectedWilaya.n})` : `Population k (${selectedWilaya.en})`}
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono bg-amber-500/15 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded shrink-0">
+                  ★ {targetYear}
+                </span>
+              </div>
+
+              {/* Interactive Metric Switcher */}
+              <div className="grid grid-cols-4 gap-1 text-[10px]">
+                {[
+                  { id: 'waterDef' as const, ar: '💧 المياه', en: '💧 Water' },
+                  { id: 'rain' as const, ar: '🌧️ المطر', en: '🌧️ Rain' },
+                  { id: 'price' as const, ar: '🏠 العقار', en: '🏠 Price' },
+                  { id: 'pop' as const, ar: '👥 السكان', en: '👥 Pop' }
+                ].map(m => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setChartMetric(m.id)}
+                    className={`py-1 rounded font-semibold transition cursor-pointer ${
+                      chartMetric === m.id
+                        ? 'bg-sky-500/25 text-sky-300 border border-sky-500/40'
+                        : 'bg-[#101C36] text-slate-400 hover:text-slate-200 border border-white/5'
+                    }`}
+                  >
+                    {isAr ? m.ar : m.en}
+                  </button>
+                ))}
+              </div>
+
+              <div className="h-44 w-full">
+                <canvas ref={chartWaterRef} />
+              </div>
+
+              <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5 border-t border-white/5">
+                <span className="flex items-center gap-1">
+                  <span className="w-2.5 h-0.5 bg-slate-400 inline-block" />
+                  <span>{isAr ? 'فعلي 22–25' : 'Actual 22–25'}</span>
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2.5 h-0.5 bg-sky-400 inline-block border-t border-dashed" />
+                  <span>{isAr ? 'استشراف 26–35' : 'Forecast 26–35'}</span>
+                </span>
+              </div>
             </div>
-            <div className="h-36 w-full bg-[#081020] p-1.5 rounded-lg border border-white/5">
-              <canvas ref={chartRadarRef} />
+
+            {/* Card 2: Interactive Multi-Sector Radar vs National Mean */}
+            <div className="bg-[#081020] p-3 rounded-xl border border-white/10 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="flex items-center gap-1 text-[11px] font-bold text-amber-300 truncate">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 inline-block shrink-0" />
+                    {isAr ? selectedWilaya.n : selectedWilaya.en}
+                  </span>
+                  {showRadarBenchmark && (
+                    <span className="flex items-center gap-1 text-[10px] text-sky-300 shrink-0">
+                      <span className="w-2 h-2 rounded-full border border-sky-400 inline-block" />
+                      {isAr ? 'الوطني' : 'Nat. Avg'}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowRadarBenchmark(b => !b)}
+                  className={`text-[10px] px-2 py-0.5 rounded border transition cursor-pointer shrink-0 ${
+                    showRadarBenchmark
+                      ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
+                      : 'bg-[#101C36] text-slate-400 border-white/10'
+                  }`}
+                >
+                  {isAr ? 'مقارنة وطنية' : 'Benchmark'}
+                </button>
+              </div>
+
+              <div className="h-52 w-full">
+                <canvas ref={chartRadarRef} />
+              </div>
             </div>
           </div>
 
-          {/* AI Diagnosis Box */}
+          {/* Wilaya-Specific Mini AI Diagnosis Box */}
           <div className="bg-emerald-950/20 border border-emerald-500/30 p-2.5 rounded-lg text-xs space-y-1">
             <div className="font-bold text-emerald-400 flex items-center gap-1">
               <span>🤖</span>
-              <span>{isAr ? `تشخيص وتوصيات الذكاء الاصطناعي (${targetYear})` : `AI Diagnosis (${targetYear})`}</span>
+              <span>{isAr ? `تشخيص ${selectedWilaya.n} (${targetYear})` : `${selectedWilaya.en} Diagnosis (${targetYear})`}</span>
             </div>
             <p className="text-slate-300 text-[11px] leading-relaxed">
               {detectAnomaly(selectedWilaya)
                 ? `⚠️ ${detectAnomaly(selectedWilaya)}`
-                : (isAr ? `الولاية مستقرة نسبياً؛ مؤشر الإجهاد المائي يتطلب سقي ذكي وربط السدود المجاورة.` : `Hydrological balance stable under current demand trend; maintain aquifer monitoring.`)}
+                : isAr
+                ? `${selectedWilaya.n}: تربة ${selectedWilaya.soil}/100 وNDVI ${selectedWilaya.ndvi} مع ${selectedWilaya.dams} سدود و${selectedWilaya.wells} بئراً (عجز ${selectedWilaya.waterDef})؛ التغطية ${selectedWilaya.coverage}%.`
+                : `${selectedWilaya.en}: Soil ${selectedWilaya.soil}/100, NDVI ${selectedWilaya.ndvi}, ${selectedWilaya.dams} dams & ${selectedWilaya.wells} wells (water ${selectedWilaya.waterDef}); ${selectedWilaya.coverage}% market coverage.`}
             </p>
           </div>
 
