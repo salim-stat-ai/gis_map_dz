@@ -4,7 +4,7 @@
  * © 2026 Salim Slimani & National Foresight System
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AgentAnalysisOutput, WilayaRecord } from '../types';
 import { AI_AGENT_PROFILES, runAgentAnalysis } from '../engines/agents';
 import { Bot, Play, Sparkles, Key, ShieldCheck, CheckCircle2 } from 'lucide-react';
@@ -38,6 +38,11 @@ export const AgentsCenter: React.FC<AgentsCenterProps> = ({
       return '';
     }
   });
+
+  useEffect(() => {
+    const result = runAgentAnalysis(activeAgentId, selectedWilaya, wilayas, targetYear, lang);
+    setAnalysisOutput(result);
+  }, [activeAgentId, selectedWilaya, wilayas, targetYear, lang]);
 
   const handleAskAgent = (agentId: string = activeAgentId) => {
     setActiveAgentId(agentId);

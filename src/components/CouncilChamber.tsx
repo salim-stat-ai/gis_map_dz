@@ -4,7 +4,7 @@
  * © 2026 Salim Slimani & National Foresight System
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CouncilConsensusResult, WilayaRecord } from '../types';
 import { conveneAiCouncil } from '../engines/council';
 import { Landmark, Sparkles, AlertTriangle, CheckCircle, Scale, ShieldCheck, ArrowRight } from 'lucide-react';
@@ -30,6 +30,10 @@ export const CouncilChamber: React.FC<CouncilChamberProps> = ({
     conveneAiCouncil(selectedWilaya, wilayas, targetYear, lang)
   );
   const [isConvening, setIsConvening] = useState<boolean>(false);
+
+  useEffect(() => {
+    setCouncilResult(conveneAiCouncil(selectedWilaya, wilayas, targetYear, lang));
+  }, [selectedWilaya, wilayas, targetYear, lang]);
 
   const handleConveneCouncil = () => {
     setIsConvening(true);

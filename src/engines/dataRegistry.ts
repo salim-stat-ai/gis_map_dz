@@ -87,12 +87,19 @@ export const ALGERIA_DATA_SOURCES: DataSourceMeta[] = [
   }
 ];
 
-// Helper to synthesize realistic 2018-2025 historical data based on 2026 base
-function generateHistory(baseVal: number, trendSlope: number, noiseStd: number, count: number = 8): number[] {
+// Helper to synthesize realistic, wilaya-specific 2018-2025 historical data based on 2026 base
+function generateHistory(
+  baseVal: number,
+  trendSlope: number,
+  noiseStd: number,
+  phaseSeed: number = 1,
+  count: number = 8
+): number[] {
   const result: number[] = [];
   for (let i = 0; i < count; i++) {
     const yearsAgo = count - 1 - i;
-    const value = baseVal - (yearsAgo * trendSlope) + (Math.sin(i * 1.7) * noiseStd);
+    const harmonic = Math.sin((i + 1) * (1.25 + (phaseSeed % 5) * 0.19) + phaseSeed) * noiseStd;
+    const value = baseVal - (yearsAgo * trendSlope) + harmonic;
     result.push(Math.round(value * 10) / 10);
   }
   return result;
@@ -157,14 +164,21 @@ export const INITIAL_WILAYAS: WilayaRecord[] = [
   {num:56, n:"جانت", en:"Djanet", lat:24.55, lon:9.48, region:'Sahara', pop:20, price:26000, flood:0.04, soil:24, rain:25, ndvi:0.08, dams:0, wells:50, waterDef:-30, markets:1, coverage:28, energy:50, roads:42, labor:15, industry:28},
   {num:57, n:"المغير", en:"El M'Ghair", lat:33.95, lon:5.92, region:'Sahara', pop:170, price:36000, flood:0.05, soil:40, rain:90, ndvi:0.22, dams:0, wells:320, waterDef:-27, markets:4, coverage:50, energy:62, roads:66, labor:32, industry:36},
   {num:58, n:"المنيعة", en:"El Meniaa", lat:30.58, lon:2.88, region:'Sahara', pop:70, price:30000, flood:0.04, soil:32, rain:60, ndvi:0.14, dams:0, wells:180, waterDef:-32, markets:2, coverage:35, energy:55, roads:55, labor:25, industry:32},
-].map(w => ({
-  ...w,
-  historicalYears: [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025],
-  historicalRain: generateHistory(w.rain, -3.2, w.rain * 0.08),
-  historicalWaterDef: generateHistory(w.waterDef, -0.9, 1.5),
-  historicalPop: generateHistory(w.pop, 8.5, 2.0),
-  historicalPrice: generateHistory(w.price, 2800, 1500)
-}));
+].map(w => {
+  const rainSlope = -(w.rain * (w.region === 'Sahara' ? 0.008 : 0.012) + (w.num % 3) * 0.4);
+  const waterSlope = -(0.35 + (w.wells / 900) * 0.65 - w.dams * 0.12 + (w.pop / 2000) * 0.35);
+  const popSlope = Math.max(0.8, w.pop * (w.region === 'Sahara' ? 0.019 : 0.014));
+  const priceSlope = Math.round(w.price * (0.025 + (w.industry / 100) * 0.018));
+
+  return {
+    ...w,
+    historicalYears: [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025],
+    historicalRain: generateHistory(w.rain, rainSlope, Math.max(2, w.rain * (0.06 + (w.num % 4) * 0.015)), w.num * 0.7),
+    historicalWaterDef: generateHistory(w.waterDef, waterSlope, 0.9 + (w.num % 5) * 0.28, w.num * 1.1),
+    historicalPop: generateHistory(w.pop, popSlope, Math.max(0.5, w.pop * 0.006), w.num * 0.5),
+    historicalPrice: generateHistory(w.price, priceSlope, Math.round(w.price * (0.018 + (w.num % 3) * 0.005)), w.num * 1.3)
+  };
+});
 
 export function getWilayaDisplayName(w: WilayaRecord, lang: 'ar' | 'en' = 'ar'): string {
   if (lang === 'ar') {
