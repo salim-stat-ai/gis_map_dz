@@ -21,7 +21,6 @@ import { EarlyWarningDashboard } from './components/EarlyWarningDashboard';
 import { Foresight2030Dashboard } from './components/Foresight2030Dashboard';
 import { DataImportStudio } from './components/DataImportStudio';
 import { ReportModal } from './components/ReportModal';
-import { PortableDesktopModal } from './components/PortableDesktopModal';
 import { useOnlineStatus } from './hooks/usePWAInstall';
 import bannerSvg from '../assets/banner.svg';
 
@@ -36,7 +35,6 @@ export default function App() {
   const [lang, setLang] = useState<'ar' | 'en'>('en');
   const [activeTab, setActiveTab] = useState<string>('map');
   const [isReportOpen, setIsReportOpen] = useState<boolean>(false);
-  const [isPortableOpen, setIsPortableOpen] = useState<boolean>(false);
   const [mapFocusRequest, setMapFocusRequest] = useState<{ wilayaNum: number; ts: number } | null>(null);
   const isOnline = useOnlineStatus();
 
@@ -83,7 +81,6 @@ export default function App() {
         onToggleLang={() => setLang(l => (l === 'ar' ? 'en' : 'ar'))}
         onQuickAiDiagnosis={handleQuickAiDiagnosis}
         onOpenReport={() => setIsReportOpen(true)}
-        onOpenPortable={() => setIsPortableOpen(true)}
         onNavigateTab={setActiveTab}
       />
 
@@ -266,13 +263,6 @@ export default function App() {
         wilayas={wilayas}
         targetYear={targetYear}
         initialLang={lang}
-      />
-
-      {/* Portable Desktop Edition Modal */}
-      <PortableDesktopModal
-        isOpen={isPortableOpen}
-        onClose={() => setIsPortableOpen(false)}
-        lang={lang}
       />
 
       {/* Offline Connectivity Indicator */}

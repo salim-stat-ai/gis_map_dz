@@ -201,6 +201,90 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
   };
 
   // ==========================================
+  // Dynamic Real-World Interpretations
+  // ==========================================
+  const selectedLisaPt = useMemo(
+    () => lisaScatter.points.find(p => p.wilayaNum === selectedWilaya.num) || lisaScatter.points[0],
+    [lisaScatter, selectedWilaya.num]
+  );
+
+  const selectedHotspot = useMemo(
+    () => hotspots.find(h => h.wilayaNum === selectedWilaya.num) || hotspots[0],
+    [hotspots, selectedWilaya.num]
+  );
+
+  const lisaRealWorld = useMemo(() => {
+    const clusterShare = Math.round(((lisaScatter.counts.HH + lisaScatter.counts.LL) / Math.max(1, wilayas.length)) * 100);
+    const wName = isAr ? selectedWilaya.n : selectedWilaya.en;
+    const pt = selectedLisaPt;
+    const isDeficitMetric = activeSpatialMetric === 'waterDef';
+
+    const quadMeaningAr: Record<'HH' | 'LL' | 'HL' | 'LH', string> = isDeficitMetric
+      ? {
+          HH: 'رصيد مائي أفضل من المتوسط وسط جوار مائي مستقر (تكتل إيجابي)',
+          LL: 'عجز مائي حاد محاط بولايات مجاورة تعاني هي أيضاً من عجز مائي شديد (بؤرة إجهاد إقليمي)',
+          HL: 'توازن مائي أفضل من جوارها الذي يعاني عجزاً مائياً حاداً (ولاية إسناد محتملة)',
+          LH: 'عجز مائي أعمق من المتوسط وسط محيط مجاور وضعه المائي أفضل (جيب ضغط محلي)'
+        }
+      : {
+          HH: 'قيمة مرتفعة جداً محاطة بولايات مرتفعة أيضاً (حزام تركّز قوي ممتد إقليمياً)',
+          LL: 'قيمة منخفضة محاطة بجوار منخفض مماثل (حزام تراجع أو هدوء جغرافي مشترك)',
+          HL: 'جزيرة مرتفعة (قطب منفرد) وسط إقليم قيمه منخفضة — تجذب النشاط من محيطها',
+          LH: 'جيب منخفض معزول وسط حزام إقليمي مرتفع القيمة — يمثل فجوة استدراك محلية'
+        };
+
+    const quadMeaningEn: Record<'HH' | 'LL' | 'HL' | 'LH', string> = isDeficitMetric
+      ? {
+          HH: 'Healthier water balance surrounded by stable neighboring basins',
+          LL: 'Severe water deficit clustered inside a water-stressed regional belt',
+          HL: 'Better water balance than surrounding deficit-stressed neighbors (potential relief anchor)',
+          LH: 'Deeper local deficit surrounded by healthier neighboring basins (localized bottleneck)'
+        }
+      : {
+          HH: 'High indicator value clustered inside a high-value regional belt',
+          LL: 'Low indicator value surrounded by similarly low neighbors',
+          HL: 'High-value island / pole isolated inside a low-value region',
+          LH: 'Low-value pocket surrounded by a high-performing belt (catch-up opportunity)'
+        };
+
+    return {
+      clusterShare,
+      wName,
+      pt,
+      quadDesc: isAr ? quadMeaningAr[pt.quadrant] : quadMeaningEn[pt.quadrant],
+      axisNote: isAr
+        ? 'المحور الأفقي (Z_i) يقيس موقع الولاية مقارنة بالمتوسط الوطني (0 = المتوسط)، والمحور العمودي (W·Z_i) يقيس متوسط جيرانها الجغرافيين. كلما ارتفعت النقاط على القطر من أسفل اليسار إلى أعلى اليمين، زادت قوة التكتل الجغرافي المتشابه.'
+        : 'The X-axis (Z_i) compares each wilaya against the national mean (0), while the Y-axis (W·Z_i) measures its geographic neighbors. Alignment along the bottom-left to top-right diagonal confirms strong regional spillover.'
+    };
+  }, [lisaScatter, wilayas.length, isAr, selectedWilaya, selectedLisaPt, activeSpatialMetric]);
+
+  const regressionRealWorld = useMemo(() => {
+    const posOutlier = spatialReg.residuals.find(r => r.residual > 0);
+    const negOutlier = spatialReg.residuals.find(r => r.residual < 0);
+    return { posOutlier, negOutlier };
+  }, [spatialReg]);
+
+  const regionalRealWorld = useMemo(() => {
+    const list = Object.values(regionalSummaries);
+    const maxCvReg = [...list].sort((a, b) => b.deficitCvPct - a.deficitCvPct)[0];
+    const maxIndReg = [...list].sort((a, b) => b.avgIndustry - a.avgIndustry)[0];
+    const worstWaterReg = [...list].sort((a, b) => a.avgDeficit - b.avgDeficit)[0];
+    return { maxCvReg, maxIndReg, worstWaterReg };
+  }, [regionalSummaries]);
+
+  const ahpRealWorld = useMemo(() => {
+    const winner = ahpResult.rankedWilayas[0];
+    const contribs = winner ? ahpResult.contributionsByWilaya[winner.wilaya] || {} : {};
+    const topCritEntry = Object.entries(contribs).sort((a, b) => b[1] - a[1])[0];
+    const topCritObj = ahpCriteria.find(c => c.id === topCritEntry?.[0]);
+    return {
+      winner,
+      topCritName: topCritObj ? (isAr ? topCritObj.nameAr : topCritObj.name) : '',
+      topCritPts: topCritEntry?.[1] ?? 0
+    };
+  }, [ahpResult, ahpCriteria, isAr]);
+
+  // ==========================================
   // Chart 1: LISA Moran Scatterplot (Tab 1)
   // ==========================================
   useEffect(() => {
@@ -741,6 +825,27 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
                   <span>{isAr ? 'جيوب منخفضة وسط محيط مرتفع' : 'Spatial outlier: Low pocket in High belt'}</span>
                 </div>
               </div>
+
+              {/* Dynamic Real-World Reading of LISA Scatterplot & Active Wilaya */}
+              <div className="bg-[#101D38] border border-purple-500/25 rounded-xl p-3.5 text-[11px] text-slate-300 space-y-2 leading-relaxed">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <b className="text-purple-300 text-xs">
+                    {isAr ? `📖 تفسير المنحنى على أرض الواقع — ${lisaRealWorld.wName}` : `📖 Live Real-World Reading — ${lisaRealWorld.wName}`}
+                  </b>
+                  <span className="font-mono text-[10px] text-amber-300">
+                    {isAr
+                      ? `ربع ${lisaRealWorld.pt.quadrant} | Z = ${lisaRealWorld.pt.z} | W·Z = ${lisaRealWorld.pt.wz} | Gi* = ${selectedHotspot.giZScore}`
+                      : `Quad ${lisaRealWorld.pt.quadrant} | Z = ${lisaRealWorld.pt.z} | W·Z = ${lisaRealWorld.pt.wz} | Gi* = ${selectedHotspot.giZScore}`}
+                  </span>
+                </div>
+                <p>{lisaRealWorld.axisNote}</p>
+                <p className="text-slate-200">
+                  <b className="text-emerald-400">{isAr ? 'موقع الولاية المختارة:' : 'Selected Wilaya Position:'}</b>{' '}
+                  {isAr
+                    ? `تقع ولاية ${lisaRealWorld.wName} (القيمة الفعلية: ${lisaRealWorld.pt.rawValue}) في الربع (${lisaRealWorld.pt.quadrant}) بمعامل تكتل محلي I_i = ${lisaRealWorld.pt.localI}، وهو ما يعني: ${lisaRealWorld.quadDesc}. كما تخضع ${lisaRealWorld.clusterShare}% من ولايات الوطن لقانون الترابط الإقليمي المتشابه (HH + LL).`
+                    : `${lisaRealWorld.wName} (raw value ${lisaRealWorld.pt.rawValue}) sits in Quadrant ${lisaRealWorld.pt.quadrant} (Local I_i = ${lisaRealWorld.pt.localI}): ${lisaRealWorld.quadDesc}. Nationally, ${lisaRealWorld.clusterShare}% of wilayas exhibit positive neighbor clustering (HH + LL).`}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -993,6 +1098,17 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
               </div>
             </div>
           </div>
+
+          <div className="bg-[#0D172E] border border-white/10 rounded-2xl p-4 text-[11px] text-slate-300 leading-relaxed space-y-1.5">
+            <b className="text-emerald-400 text-xs block">
+              {isAr ? '📖 قراءة تطبيقية لمنحنى التنبؤ والبواقي (Observed vs Predicted):' : '📖 Interpreting Predicted Fit & Spatial Anomalies:'}
+            </b>
+            <p>
+              {isAr
+                ? `النقاط القريبة من الخط الأخضر المتقطع (Y = Ŷ) تخضع بدقة لقوانين الجغرافيا والجوار المكاني (يفسر النموذج ${Math.round(spatialReg.r2 * 100)}% من التباين الوطني، مقابل AIC = ${spatialReg.aic}). النقاط التي تقع أعلى الخط تحقق فعلياً قيماً أكبر من المتوقع (مثل ${regressionRealWorld.posOutlier?.wilayaNameAr || ''} بفارق +${regressionRealWorld.posOutlier?.residual ?? 0})، بينما النقاط أدنى الخط تقل عن جوارها (مثل ${regressionRealWorld.negOutlier?.wilayaNameAr || ''} بفارق ${regressionRealWorld.negOutlier?.residual ?? 0}) نتيجة عوامل محلية خاصة كالسدود أو الثقل الديمغرافي أو العزلة الطرقية.`
+                : `Wilayas near the dashed 45° green fit line behave as neighboring geography predicts (model explains ${Math.round(spatialReg.r2 * 100)}% of variance; AIC = ${spatialReg.aic}). Points above the line exceed expectations (${regressionRealWorld.posOutlier?.wilayaName || ''}: +${regressionRealWorld.posOutlier?.residual ?? 0}), while points below underperform (${regressionRealWorld.negOutlier?.wilayaName || ''}: ${regressionRealWorld.negOutlier?.residual ?? 0}) due to localized structural factors.`}
+            </p>
+          </div>
         </div>
       )}
 
@@ -1145,6 +1261,17 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
                 ))}
               </div>
             </div>
+          </div>
+
+          <div className="bg-[#0D172E] border border-white/10 rounded-2xl p-4 text-[11px] text-slate-300 leading-relaxed space-y-1.5">
+            <b className="text-sky-300 text-xs block">
+              {isAr ? '📖 تفسير خريطة الكثافة (KDE) ومنحنى شبه التباين (Semivariogram):' : '📖 Interpreting KDE Surface, Semivariogram & LOOCV Accuracy:'}
+            </b>
+            <p>
+              {isAr
+                ? `• منحنى شبه التباين γ(h): يُظهر كيف يضعف التشابه الجغرافي مع البعد بالكيلومترات؛ قيمة العتبة القاعدية (Nugget = ${variogram.nugget}) تقيس الفروقات المحلية الدقيقة، وقيمة السقف (Sill = ${variogram.sill}) تمثل التباين الأقصى حيث يتلاشى أثر الجوار بعد مدى ${krigingRangeKm} كم. • دقة التحقق التبادلي (LOOCV RMSE = ${interpResult.rmse}): كلما انخفضت القيمة، زادت موثوقية التقدير في المناطق التي تغيب عنها محطات القياس، بينما تقع ذروة تركز الكثافة عند (${kdeResult.peakCoord.lat}°, ${kdeResult.peakCoord.lon}°).`
+                : `• Semivariogram γ(h): Shows how spatial similarity decays with distance; Nugget (${variogram.nugget}) captures micro-scale local noise, Sill (${variogram.sill}) marks maximum variance plateau beyond Range ${krigingRangeKm} km. • LOOCV Validation (RMSE = ${interpResult.rmse}, MAE = ${interpResult.mae}): Measures out-of-sample estimation precision across unmeasured zones, with KDE spatial peak at (${kdeResult.peakCoord.lat}°, ${kdeResult.peakCoord.lon}°).`}
+            </p>
           </div>
         </div>
       )}
@@ -1308,6 +1435,15 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
                 </table>
               </div>
             </div>
+
+            <div className="bg-[#101D38] border border-white/5 rounded-xl p-3.5 text-[11px] text-slate-300 leading-relaxed">
+              <b className="text-emerald-400 text-xs block mb-1">
+                {isAr ? '📖 قراءة منحنى تناقص الجاذبية (Huff Gravity Model):' : '📖 Interpreting Huff Catchment Decay:'}
+              </b>
+              {isAr
+                ? `تنال ولاية ${proximity.allSortedByDistance[0]?.wilaya.n || ''} وما جاورها ضمن دائرة ${proximityRadiusKm} كم أكبر حصة تفاعل (${proximity.allSortedByDistance[0]?.huffSharePct ?? 0}%) تبعاً لحجم كتلتها السكانية وقربها بالكيلومتر (معامل الاحتكاك β = ${gravityBeta}). تضم الدائرة حالياً ${proximity.withinRadius.length} ولاية بمتوسط ${proximity.avgMetricInRadius} مقارنة بـ ${proximity.nationalAvgMetric} وطنياً، ما يحدد مسارات التبادل اللوجستي والإمداد الأقل كلفة.`
+                : `Under distance friction β = ${gravityBeta}, ${proximity.allSortedByDistance[0]?.wilaya.en || ''} captures the top attraction share (${proximity.allSortedByDistance[0]?.huffSharePct ?? 0}%). The ${proximityRadiusKm} km ring encloses ${proximity.withinRadius.length} neighboring wilayas averaging ${proximity.avgMetricInRadius} vs ${proximity.nationalAvgMetric} nationally, guiding low-cost supply and relief corridors.`}
+            </div>
           </div>
         </div>
       )}
@@ -1373,14 +1509,19 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
             })}
           </div>
 
-          <div className="bg-[#081020] p-4 rounded-xl border border-white/10">
-            <h3 className="text-xs font-bold text-white mb-2 flex items-center gap-2">
+          <div className="bg-[#081020] p-4 rounded-xl border border-white/10 space-y-2.5">
+            <h3 className="text-xs font-bold text-white flex items-center gap-2">
               <Layers className="w-3.5 h-3.5 text-emerald-400" />
               <span>{isAr ? 'مقارنة التغطية والجاهزية الصناعية والتفاوت الداخلي عبر الأقاليم الـ 5' : 'Cross-Region Benchmark: Retail Coverage, Industry & Water CV%'}</span>
             </h3>
             <div className="h-56">
               <canvas ref={regionChartRef} />
             </div>
+            <p className="text-[11px] text-slate-300 leading-relaxed pt-1 border-t border-white/10">
+              {isAr
+                ? `📖 قراءة التفاوت الإقليمي: يسجل إقليم "${regionalRealWorld.maxCvReg?.regionNameAr}" أعلى تباين داخلي للموارد المائية (CV = ${regionalRealWorld.maxCvReg?.deficitCvPct}%) مما يعني تفاوتاً حاداً بين ولاياته، بينما يتصدر "${regionalRealWorld.maxIndReg?.regionNameAr}" الجاهزية الصناعية (${regionalRealWorld.maxIndReg?.avgIndustry}/100)، ويسجل "${regionalRealWorld.worstWaterReg?.regionNameAr}" أشد متوسط عجز مائي (${regionalRealWorld.worstWaterReg?.avgDeficit}).`
+                : `📖 Regional Disparity Reading: "${regionalRealWorld.maxCvReg?.regionName}" exhibits the widest internal water disparity (CV = ${regionalRealWorld.maxCvReg?.deficitCvPct}%), "${regionalRealWorld.maxIndReg?.regionName}" leads industrial readiness (${regionalRealWorld.maxIndReg?.avgIndustry}/100), and "${regionalRealWorld.worstWaterReg?.regionName}" carries the deepest mean water deficit (${regionalRealWorld.worstWaterReg?.avgDeficit}).`}
+            </p>
           </div>
 
           <div>
@@ -1484,13 +1625,18 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
           </div>
 
           {/* Stacked AHP Contribution Chart */}
-          <div className="bg-[#081020] p-4 rounded-xl border border-white/10">
-            <h3 className="text-xs font-bold text-white mb-2">
+          <div className="bg-[#081020] p-4 rounded-xl border border-white/10 space-y-2.5">
+            <h3 className="text-xs font-bold text-white">
               {isAr ? 'تفكيك مساهمة كل معيار في الترتيب العام لأفضل 10 ولايات' : 'AHP Score Decomposition Across Top 10 Ranked Wilayas'}
             </h3>
             <div className="h-56">
               <canvas ref={ahpChartRef} />
             </div>
+            <p className="text-[11px] text-slate-300 leading-relaxed pt-1 border-t border-white/10">
+              {isAr
+                ? `📖 تفسير الترتيب وتدقيق الاتساق: مؤشر الاتساق CR = ${ahpResult.consistencyRatio} (${ahpResult.isConsistent ? 'مقبول علمياً < 0.10 أي أن الأوزان متزنة ومنطقية' : 'مرتفع ≥ 0.10 بسبب تركيز الوزن على معيار واحد'}). تتصدر ولاية "${ahpRealWorld.winner?.wilayaAr}" بنتيجة ${ahpRealWorld.winner?.score}/100، وجاء الداعم الأكبر لتفوقها من معيار "${ahpRealWorld.topCritName}" (+${ahpRealWorld.topCritPts} نقطة).`
+                : `📖 AHP Decision Reading: Consistency Ratio CR = ${ahpResult.consistencyRatio} (${ahpResult.isConsistent ? 'logically coherent < 0.10' : 'high dispersion ≥ 0.10'}). "${ahpRealWorld.winner?.wilaya}" ranks #1 (${ahpRealWorld.winner?.score}/100), driven primarily by "${ahpRealWorld.topCritName}" (+${ahpRealWorld.topCritPts} pts).`}
+            </p>
           </div>
 
           {/* Top 10 Ranked Wilayas Cards */}

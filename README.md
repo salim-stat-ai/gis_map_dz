@@ -277,6 +277,15 @@ The repository is fully optimized for automated zero-config deployment on [Verce
 3. Build command: `npm run build`.
 4. Output directory: `dist`.
 
+### Portable Desktop Edition (GitHub Only)
+The standalone offline desktop edition is maintained exclusively in this GitHub repository (not inside the web UI):
+- **GitHub Releases / Actions**: Trigger or tag a release (`v*`) via `.github/workflows/portable-desktop-release.yml` to build Windows `.exe` Portable, Linux `.AppImage`, cross-platform launcher `.zip`, and the single-file `GIS-Map-Algeria-2030-Portable.html`.
+- **Local Portable Build**:
+  ```bash
+  npm run build:portable
+  ```
+  See `desktop-portable/README.md` for OS launchers (`.bat` / `.command` / `.sh`) and Electron packaging (`npm run pack:win` / `npm run pack:linux`).
+
 ---
 
 ## 6. Official Data Source Attribution
