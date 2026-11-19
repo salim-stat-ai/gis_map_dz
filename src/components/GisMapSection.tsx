@@ -755,21 +755,21 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
           <hr className="my-3 border-white/10" />
 
           {/* Map Legend */}
-          <div className="text-xs space-y-1.5">
+          <div className="text-xs space-y-2.5">
             <div className="font-bold text-slate-300">
               {isAr ? `دليل الألوان (${targetYear})` : `Map Legend (${targetYear})`}
             </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>
-              <span className="text-slate-400">{isAr ? 'مستقر / آمن / جيد' : 'Safe / Good / Stable'}</span>
+            <div className="flex items-center gap-2.5">
+              <span className="w-6 h-6 rounded-full bg-emerald-500 inline-block shrink-0 shadow-sm shadow-emerald-500/30"></span>
+              <span className="text-slate-300 font-medium">{isAr ? 'مستقر / آمن / جيد' : 'Safe / Good / Stable'}</span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-amber-500 inline-block"></span>
-              <span className="text-slate-400">{isAr ? 'تحت المراقبة / متوسط' : 'Watch / Moderate Risk'}</span>
+            <div className="flex items-center gap-2.5">
+              <span className="w-6 h-6 rounded-full bg-amber-500 inline-block shrink-0 shadow-sm shadow-amber-500/30"></span>
+              <span className="text-slate-300 font-medium">{isAr ? 'تحت المراقبة / متوسط' : 'Watch / Moderate Risk'}</span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-rose-500 inline-block"></span>
-              <span className="text-slate-400">{isAr ? 'أولوية قصوى / خطر حرج' : 'Priority Risk / Critical'}</span>
+            <div className="flex items-center gap-2.5">
+              <span className="w-6 h-6 rounded-full bg-rose-500 inline-block shrink-0 shadow-sm shadow-rose-500/30"></span>
+              <span className="text-slate-300 font-medium">{isAr ? 'أولوية قصوى / خطر حرج' : 'Priority Risk / Critical'}</span>
             </div>
             <p className="text-[10px] text-slate-500 mt-1">
               {isAr ? 'حجم الدائرة يتناسب مع كثافة المؤشر' : 'Circle radius reflects indicator intensity'}
