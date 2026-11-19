@@ -754,21 +754,27 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
 
           <hr className="my-3 border-white/10" />
 
-          {/* Map Legend */}
+          {/* Map Legend (Exact 1:1 match with Map Marker Hex Colors) */}
           <div className="text-xs space-y-2.5">
             <div className="font-bold text-slate-300">
               {isAr ? `دليل الألوان (${targetYear})` : `Map Legend (${targetYear})`}
             </div>
             <div className="flex items-center gap-2.5">
-              <span className="w-6 h-6 rounded-full bg-[#10B981] ring-2 ring-white/15 inline-block shrink-0"></span>
+              <span className="w-6 h-6 rounded-full bg-[#10B981] border-2 border-[#10B981] inline-block shrink-0"></span>
               <span className="text-slate-300 font-medium">{isAr ? 'مستقر / آمن / جيد' : 'Safe / Good / Stable'}</span>
             </div>
             <div className="flex items-center gap-2.5">
-              <span className="w-6 h-6 rounded-full bg-[#FFA726] ring-2 ring-white/15 inline-block shrink-0"></span>
+              <span
+                className={`w-6 h-6 rounded-full inline-block shrink-0 border-2 ${
+                  currentSector === 'agri'
+                    ? 'bg-[#EAB308] border-[#EAB308]'
+                    : 'bg-[#F59E0B] border-[#F59E0B]'
+                }`}
+              ></span>
               <span className="text-slate-300 font-medium">{isAr ? 'تحت المراقبة / متوسط' : 'Watch / Moderate Risk'}</span>
             </div>
             <div className="flex items-center gap-2.5">
-              <span className="w-6 h-6 rounded-full bg-[#EF4444] ring-2 ring-white/15 inline-block shrink-0"></span>
+              <span className="w-6 h-6 rounded-full bg-[#EF4444] border-2 border-[#EF4444] inline-block shrink-0"></span>
               <span className="text-slate-300 font-medium">{isAr ? 'أولوية قصوى / خطر حرج' : 'Priority Risk / Critical'}</span>
             </div>
             <p className="text-[10px] text-slate-500 mt-1">
