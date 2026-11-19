@@ -142,24 +142,24 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
     if (fresh) setDossierWilaya(fresh);
   }, [wilayas, dossierWilaya]);
 
-  // Sector color function (high-contrast sRGB hex for consistent desktop & mobile rendering)
+  // Sector color function
   const getColorBySector = (w: WilayaRecord, sector: SectorKey): string => {
     if (sector === 'water') {
-      return w.waterDef < -25 ? '#EF4444' : w.waterDef < -10 ? '#FACC15' : '#10B981';
+      return w.waterDef < -25 ? '#EF4444' : w.waterDef < -10 ? '#F59E0B' : '#10B981';
     }
     if (sector === 'agri') {
-      return w.ndvi > 0.55 ? '#10B981' : w.ndvi > 0.32 ? '#FACC15' : '#EF4444';
+      return w.ndvi > 0.55 ? '#10B981' : w.ndvi > 0.32 ? '#EAB308' : '#EF4444';
     }
     if (sector === 'realestate') {
-      return w.flood > 0.4 ? '#EF4444' : w.price > 120000 ? '#FACC15' : '#10B981';
+      return w.flood > 0.4 ? '#EF4444' : w.price > 120000 ? '#F59E0B' : '#10B981';
     }
     if (sector === 'commerce') {
       const gap = Math.max(0, 100 - w.coverage);
-      return gap > 35 ? '#EF4444' : gap > 15 ? '#FACC15' : '#10B981';
+      return gap > 35 ? '#EF4444' : gap > 15 ? '#F59E0B' : '#10B981';
     }
     if (sector === 'industry') {
       const ind = Math.round(w.energy * 0.3 + w.roads * 0.3 + w.labor * 0.2 + (100 - Math.abs(w.waterDef)) * 0.2);
-      return ind > 70 ? '#10B981' : ind > 55 ? '#FACC15' : '#EF4444';
+      return ind > 70 ? '#10B981' : ind > 55 ? '#F59E0B' : '#EF4444';
     }
     // Overall composite
     const risks = [
@@ -169,7 +169,7 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
       w.rain < 180 ? 1 : 0
     ];
     const s = risks.reduce((a, b) => a + b, 0);
-    return s >= 2 ? '#EF4444' : s === 1 ? '#FACC15' : '#10B981';
+    return s >= 2 ? '#EF4444' : s === 1 ? '#F59E0B' : '#10B981';
   };
 
   // Radius sizing
@@ -760,15 +760,15 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
               {isAr ? `دليل الألوان (${targetYear})` : `Map Legend (${targetYear})`}
             </div>
             <div className="flex items-center gap-2.5">
-              <span className="w-6 h-6 rounded-full bg-[#10B981] border-2 border-[#34D399]/60 inline-block shrink-0 shadow-sm shadow-emerald-500/30"></span>
+              <span className="w-6 h-6 rounded-full bg-[#10B981] ring-2 ring-white/15 inline-block shrink-0"></span>
               <span className="text-slate-300 font-medium">{isAr ? 'مستقر / آمن / جيد' : 'Safe / Good / Stable'}</span>
             </div>
             <div className="flex items-center gap-2.5">
-              <span className="w-6 h-6 rounded-full bg-[#FACC15] border-2 border-[#FEF08A]/70 inline-block shrink-0 shadow-sm shadow-yellow-400/30"></span>
+              <span className="w-6 h-6 rounded-full bg-[#FFA726] ring-2 ring-white/15 inline-block shrink-0"></span>
               <span className="text-slate-300 font-medium">{isAr ? 'تحت المراقبة / متوسط' : 'Watch / Moderate Risk'}</span>
             </div>
             <div className="flex items-center gap-2.5">
-              <span className="w-6 h-6 rounded-full bg-[#EF4444] border-2 border-[#FCA5A5]/60 inline-block shrink-0 shadow-sm shadow-red-500/30"></span>
+              <span className="w-6 h-6 rounded-full bg-[#EF4444] ring-2 ring-white/15 inline-block shrink-0"></span>
               <span className="text-slate-300 font-medium">{isAr ? 'أولوية قصوى / خطر حرج' : 'Priority Risk / Critical'}</span>
             </div>
             <p className="text-[10px] text-slate-500 mt-1">
