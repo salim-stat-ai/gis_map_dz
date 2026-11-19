@@ -982,6 +982,55 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
                   <span>{isAr ? 'استشراف 26–35' : 'Forecast 26–35'}</span>
                 </span>
               </div>
+
+              {/* Real-world explanation of Curve 1 */}
+              {(() => {
+                const lastHist = chartMetric === 'rain'
+                  ? Math.round((selectedWilaya.historicalRain ?? [selectedWilaya.rain]).slice(-1)[0])
+                  : chartMetric === 'price'
+                  ? Math.round((selectedWilaya.historicalPrice ?? [selectedWilaya.price]).slice(-1)[0])
+                  : chartMetric === 'pop'
+                  ? Math.round((selectedWilaya.historicalPop ?? [selectedWilaya.pop]).slice(-1)[0])
+                  : Math.round(((selectedWilaya.historicalWaterDef ?? [selectedWilaya.waterDef]).slice(-1)[0]) * 10);
+
+                const calcTarget = (yr: number) => {
+                  const h = yr - 2025;
+                  if (chartMetric === 'rain') return Math.max(10, Math.round(selectedWilaya.rain * Math.pow(0.989, h)));
+                  if (chartMetric === 'price') return Math.round(selectedWilaya.price * Math.pow(1.028 + (selectedWilaya.industry / 100) * 0.012, h));
+                  if (chartMetric === 'pop') return Math.round(selectedWilaya.pop * Math.pow(selectedWilaya.region === 'Sahara' ? 1.019 : 1.015, h));
+                  return Math.round(selectedWilaya.waterDef * 10 - (selectedWilaya.pop * 0.035 * Math.max(0, yr - 2026)) * 0.15 - (selectedWilaya.rain * 0.012 * Math.max(0, yr - 2026)) * 0.2);
+                };
+
+                const valTarget = calcTarget(targetYear);
+                const val2035 = calcTarget(2035);
+                const fmt = (v: number) => chartMetric === 'price' ? `${Math.round(v / 1000)}k` : `${v}`;
+
+                const meaningText = chartMetric === 'waterDef'
+                  ? isAr
+                    ? `الخط الرمادي (2022–2025) يعكس المخزون الفعلي حتى (${lastHist}). الهبوط المتقطع نحو (${valTarget}) في ${targetYear} ثم (${val2035}) في 2035 يعني توسّع الفجوة المائية نتيجة ضغط السكان وقلة التساقط ما لم تُنجز مشاريع تحويل أو تحلية. النقطة الصفراء ★ تمثل أفق الخطة المختار.`
+                    : `Grey line shows observed storage (${lastHist} in 2025). Dashed drop to ${valTarget} (${targetYear} ★) and ${val2035} (2035) signals widening water deficit under demographic demand unless supply projects intervene.`
+                  : chartMetric === 'rain'
+                  ? isAr
+                    ? `من ${lastHist} ملم (2025) إلى ${valTarget} ملم في ${targetYear} (★) و${val2035} ملم في 2035: يوضح التراجع المناخي التدريجي وأثره المباشر على امتلاء السدود والزراعة المطرية.`
+                    : `From ${lastHist} mm (2025) to ${valTarget} mm (${targetYear} ★) and ${val2035} mm (2035): tracks climate drying pressure on dam recharge and rain-fed farming.`
+                  : chartMetric === 'price'
+                  ? isAr
+                    ? `ارتفاع السعر من ${fmt(lastHist)} إلى ${fmt(valTarget)} دج/م² (${targetYear} ★) ثم ${fmt(val2035)} (2035) يعبر عن تسارع الطلب الحضري والصناعي على الأراضي بالولاية.`
+                    : `Climb from ${fmt(lastHist)} to ${fmt(valTarget)} DZD/m² (${targetYear} ★) and ${fmt(val2035)} (2035) reflects urban and industrial land pressure.`
+                  : isAr
+                    ? `زيادة السكان من ${lastHist} ألف (2025) إلى ${valTarget} ألف (${targetYear} ★) ثم ${val2035} ألف (2035) تعني حاجة متزايدة للسكن والماء والمرافق.`
+                    : `Population growth from ${lastHist}k (2025) to ${valTarget}k (${targetYear} ★) and ${val2035}k (2035) quantifies future housing and utility demand.`;
+
+                return (
+                  <div className="bg-[#0C1730] border border-sky-500/20 rounded-lg p-2 text-[10.5px] text-slate-300 leading-relaxed space-y-1">
+                    <div className="font-bold text-sky-300 flex items-center justify-between">
+                      <span>{isAr ? '💡 ماذا يعني هذا المنحنى في الواقع؟' : '💡 What this curve means'}</span>
+                      <span className="font-mono text-[10px] text-amber-300">{fmt(lastHist)} → {fmt(valTarget)} → {fmt(val2035)}</span>
+                    </div>
+                    <p>{meaningText}</p>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Card 2: Interactive Multi-Sector Radar vs National Mean */}
@@ -1015,6 +1064,63 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
               <div className="h-52 w-full">
                 <canvas ref={chartRadarRef} />
               </div>
+
+              {/* Real-world explanation of Curve 2 (Radar) */}
+              {(() => {
+                const nCount = Math.max(1, wilayas.length);
+                const clamp = (v: number) => Math.max(0, Math.min(100, Math.round(v)));
+                const axes = [
+                  { nameAr: 'التربة', nameEn: 'Soil', wVal: clamp(selectedWilaya.soil), nVal: clamp(wilayas.reduce((s, x) => s + x.soil, 0) / nCount) },
+                  { nameAr: 'الأمطار', nameEn: 'Rain', wVal: clamp(selectedWilaya.rain / 10), nVal: clamp(wilayas.reduce((s, x) => s + x.rain / 10, 0) / nCount) },
+                  { nameAr: 'NDVI', nameEn: 'NDVI', wVal: clamp(selectedWilaya.ndvi * 100), nVal: clamp(wilayas.reduce((s, x) => s + x.ndvi * 100, 0) / nCount) },
+                  { nameAr: 'الطاقة', nameEn: 'Energy', wVal: clamp(selectedWilaya.energy), nVal: clamp(wilayas.reduce((s, x) => s + x.energy, 0) / nCount) },
+                  { nameAr: 'الطرق', nameEn: 'Roads', wVal: clamp(selectedWilaya.roads), nVal: clamp(wilayas.reduce((s, x) => s + x.roads, 0) / nCount) },
+                  { nameAr: 'التغطية', nameEn: 'Coverage', wVal: clamp(selectedWilaya.coverage), nVal: clamp(wilayas.reduce((s, x) => s + x.coverage, 0) / nCount) }
+                ];
+                const strengths = axes.filter(a => a.wVal >= a.nVal + 3).sort((a, b) => (b.wVal - b.nVal) - (a.wVal - a.nVal));
+                const weakAxes = axes.filter(a => a.wVal < a.nVal).sort((a, b) => (a.wVal - a.nVal) - (b.wVal - b.nVal));
+                const tightest = [...axes].sort((a, b) => a.wVal - b.wVal)[0];
+
+                return (
+                  <div className="bg-[#0C1730] border border-amber-500/20 rounded-lg p-2 text-[10.5px] text-slate-300 leading-relaxed space-y-1">
+                    <div className="font-bold text-amber-300">
+                      {isAr ? '🧭 قراءة الرادار السداسي في الواقع:' : '🧭 How to read this radar in reality:'}
+                    </div>
+                    <p>
+                      {isAr
+                        ? `كلما خرج المضلع البرتقالي (${selectedWilaya.n}) خارج الخط الأزرق المتقطع (المتوسط الوطني)، دلّ على تفوق ميداني؛ وكلما اقترب من المركز (0) دلّ على نقطة ضعف.`
+                        : `Points where the orange polygon extends outside the dashed blue ring show above-average territorial strength; inward dips show bottlenecks.`}
+                    </p>
+                    <p className="text-[10px] text-slate-200">
+                      {isAr ? (
+                        <>
+                          <b className="text-emerald-400">نقاط القوة:</b>{' '}
+                          {strengths.length > 0
+                            ? strengths.slice(0, 3).map(s => `${s.nameAr} (${s.wVal} مقابل ${s.nVal})`).join('، ')
+                            : 'أداء متقارب مع المعدل الوطني'}{' '}
+                          ·{' '}
+                          <b className="text-amber-300">{weakAxes.length > 0 ? 'فجوة مقارنة بالوطني:' : 'أضيق محور:'}</b>{' '}
+                          {weakAxes.length > 0
+                            ? weakAxes.map(a => `${a.nameAr} (${a.wVal} مقابل ${a.nVal})`).join('، ')
+                            : `${tightest.nameAr} (${tightest.wVal}/100)`}
+                        </>
+                      ) : (
+                        <>
+                          <b className="text-emerald-400">Strengths:</b>{' '}
+                          {strengths.length > 0
+                            ? strengths.slice(0, 3).map(s => `${s.nameEn} (${s.wVal} vs ${s.nVal})`).join(', ')
+                            : 'Near national mean'}{' '}
+                          ·{' '}
+                          <b className="text-amber-300">{weakAxes.length > 0 ? 'Lagging Nat. Avg:' : 'Tightest Axis:'}</b>{' '}
+                          {weakAxes.length > 0
+                            ? weakAxes.map(a => `${a.nameEn} (${a.wVal} vs ${a.nVal})`).join(', ')
+                            : `${tightest.nameEn} (${tightest.wVal}/100)`}
+                        </>
+                      )}
+                    </p>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
