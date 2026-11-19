@@ -2,6 +2,7 @@
 
 @layer base {
   :root {
+    color-scheme: dark;
     --bg-primary: #070D1B;
     --bg-card: #0D172E;
     --bg-card-hover: #132244;
