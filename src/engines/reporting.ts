@@ -1253,14 +1253,25 @@ export function generateModernForesightReportHtml(options: ReportGenerationOptio
             </tr>
           </thead>
           <tbody>
-            ${earlyWarnings.filter(a => a.wilayaNum === w.num).slice(0, 5).map(a => `
+            ${earlyWarnings.filter(a => a.wilayaNum === w.num).slice(0, 6).map(a => `
               <tr>
-                <td><b>${a.category.toUpperCase()}</b></td>
+                <td>
+                  <b>${a.category.toUpperCase()}</b>
+                  ${a.geoZoneLabel ? `<br><small style="color:#0369A1;">${isAr ? a.geoZoneLabelAr : a.geoZoneLabel}</small>` : ''}
+                </td>
                 <td><span class="rep-risk r${a.severity === 'CRITICAL' ? 3 : a.severity === 'HIGH' ? 2 : 1}">${a.severity}</span></td>
                 <td>${a.metric}</td>
                 <td><b>${a.currentValue}</b></td>
                 <td>${a.criticalThreshold}</td>
-                <td><small>${isAr ? a.suggestedActionAr : a.suggestedAction}</small></td>
+                <td>
+                  ${a.protocols ? `
+                    <div style="font-size:11px; line-height:1.45;">
+                      <div><b style="color:#059669;">${isAr ? 'قصير (0-12ش):' : isFr ? 'Court :' : 'Short (0-12m):'}</b> ${isAr ? a.protocols.shortTermAr : a.protocols.shortTerm}</div>
+                      <div><b style="color:#0284C7;">${isAr ? 'متوسط (1-3س):' : isFr ? 'Moyen :' : 'Medium (1-3y):'}</b> ${isAr ? a.protocols.mediumTermAr : a.protocols.mediumTerm}</div>
+                      <div><b style="color:#7C3AED;">${isAr ? 'طويل (2030+):' : isFr ? 'Long :' : 'Long (2030+):'}</b> ${isAr ? a.protocols.longTermAr : a.protocols.longTerm}</div>
+                    </div>
+                  ` : `<small>${isAr ? a.suggestedActionAr : a.suggestedAction}</small>`}
+                </td>
               </tr>
             `).join('')}
             ${earlyWarnings.filter(a => a.wilayaNum === w.num).length === 0 ? `

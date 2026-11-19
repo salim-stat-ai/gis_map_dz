@@ -79,6 +79,7 @@ interface GisMapSectionProps {
   lang: 'ar' | 'en';
   onNavigateTab: (tabId: string) => void;
   onOpenReport?: () => void;
+  focusRequest?: { wilayaNum: number; ts: number } | null;
 }
 
 export const GisMapSection: React.FC<GisMapSectionProps> = ({
@@ -91,7 +92,8 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
   onYearChange,
   lang,
   onNavigateTab,
-  onOpenReport
+  onOpenReport,
+  focusRequest
 }) => {
   const isAr = lang === 'ar';
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -256,14 +258,33 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
     });
   }, [wilayas, currentSector, targetYear, showAnomalies, isAr, selectedWilaya]);
 
-  // Center on selected wilaya
+  // Center on selected wilaya & open popup (plus scroll into view when navigated from another tab)
   useEffect(() => {
-    if (mapInstanceRef.current && selectedWilaya) {
-      mapInstanceRef.current.flyTo([selectedWilaya.lat, selectedWilaya.lon], 7, {
-        duration: 1.2
-      });
-    }
-  }, [selectedWilaya]);
+    const map = mapInstanceRef.current;
+    if (!map || !selectedWilaya) return;
+
+    const timer = window.setTimeout(() => {
+      map.invalidateSize();
+      if (focusRequest && focusRequest.wilayaNum === selectedWilaya.num && mapContainerRef.current) {
+        mapContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      const targetName = selectedWilaya.en;
+      const targetLatLng = L.latLng(selectedWilaya.lat, selectedWilaya.lon);
+      const alreadyAtTarget = map.getCenter().distanceTo(targetLatLng) < 500 && map.getZoom() === 7;
+      if (alreadyAtTarget) {
+        markersRef.current[targetName]?.openPopup();
+      } else {
+        map.once('moveend', () => {
+          markersRef.current[targetName]?.openPopup();
+        });
+        map.flyTo([selectedWilaya.lat, selectedWilaya.lon], 7, {
+          duration: 0.9
+        });
+      }
+    }, 120);
+
+    return () => window.clearTimeout(timer);
+  }, [selectedWilaya, focusRequest]);
 
   // Draw Interactive Charts (Trajectory + National-Benchmarked Radar)
   useEffect(() => {

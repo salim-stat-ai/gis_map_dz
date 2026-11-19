@@ -33,6 +33,7 @@ export default function App() {
   const [lang, setLang] = useState<'ar' | 'en'>('en');
   const [activeTab, setActiveTab] = useState<string>('map');
   const [isReportOpen, setIsReportOpen] = useState<boolean>(false);
+  const [mapFocusRequest, setMapFocusRequest] = useState<{ wilayaNum: number; ts: number } | null>(null);
 
   // Sync document direction and language with state
   useEffect(() => {
@@ -46,6 +47,12 @@ export default function App() {
 
   const handleQuickAiDiagnosis = () => {
     setActiveTab('council');
+  };
+
+  const handleViewWilayaOnMap = (w: WilayaRecord) => {
+    setSelectedWilaya(w);
+    setActiveTab('map');
+    setMapFocusRequest({ wilayaNum: w.num, ts: Date.now() });
   };
 
   const handleMergeWilayas = (merged: WilayaRecord[]) => {
@@ -162,6 +169,7 @@ export default function App() {
             lang={lang}
             onNavigateTab={setActiveTab}
             onOpenReport={() => setIsReportOpen(true)}
+            focusRequest={mapFocusRequest}
           />
         )}
 
@@ -217,6 +225,7 @@ export default function App() {
             wilayas={wilayas}
             selectedWilaya={selectedWilaya}
             onSelectWilaya={setSelectedWilaya}
+            onViewOnMap={handleViewWilayaOnMap}
             targetYear={targetYear}
             lang={lang}
           />

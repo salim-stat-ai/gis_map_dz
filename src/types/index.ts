@@ -208,6 +208,17 @@ export interface CouncilConsensusResult {
   }[];
 }
 
+export type GeoZoneId = 'coastal' | 'tell_basin' | 'high_plateaus' | 'oasis_north' | 'deep_sahara';
+
+export interface ProtocolHorizons {
+  shortTerm: string;
+  shortTermAr: string;
+  mediumTerm: string;
+  mediumTermAr: string;
+  longTerm: string;
+  longTermAr: string;
+}
+
 export interface EarlyWarningAlert {
   id: string;
   category: 'water' | 'drought' | 'flood' | 'commerce' | 'industry' | 'anomaly';
@@ -215,6 +226,11 @@ export interface EarlyWarningAlert {
   wilayaNum: number;
   wilayaEn: string;
   wilayaAr: string;
+  geoZone?: GeoZoneId;
+  geoZoneLabel?: string;
+  geoZoneLabelAr?: string;
+  regionalAssetNote?: string;
+  regionalAssetNoteAr?: string;
   metric: string;
   currentValue: number | string;
   criticalThreshold: number | string;
@@ -223,6 +239,7 @@ export interface EarlyWarningAlert {
   uncertaintyMargin: string;
   suggestedAction: string;
   suggestedActionAr: string;
+  protocols?: ProtocolHorizons;
 }
 
 export interface DataSourceMeta {
