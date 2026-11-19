@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="gis_map logo">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B3B66"/>
+      <stop offset="1" stop-color="#062B26"/>
+    </linearGradient>
+    <linearGradient id="em" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#10B981"/>
+      <stop offset="1" stop-color="#0EA5E9"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="url(#bg)"/>
+  <rect x="8" y="8" width="240" height="240" rx="50" fill="none" stroke="#10B981" stroke-width="4" opacity="0.35"/>
+  <!-- map hexagon -->
+  <path d="M128 34 L208 78 V162 L128 206 L48 162 V78 Z" fill="rgba(16,185,129,0.08)" stroke="url(#em)" stroke-width="12" stroke-linejoin="round"/>
+  <!-- graticule lines -->
+  <path d="M48 118 H208 M88 56 V184 M168 56 V184" stroke="#0EA5E9" stroke-width="4" opacity="0.35"/>
+  <!-- pin -->
+  <path d="M128 88 c-22 0 -36 15 -36 33 0 24 36 62 36 62 s36 -38 36 -62 c0 -18 -14 -33 -36 -33 z" fill="#F59E0B"/>
+  <circle cx="128" cy="121" r="13" fill="#0B1220"/>
+  <ellipse cx="128" cy="196" rx="26" ry="7" fill="#F59E0B" opacity="0.45"/>
+</svg>

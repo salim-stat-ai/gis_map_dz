@@ -1164,7 +1164,7 @@ export function generateModernForesightReportHtml(options: ReportGenerationOptio
           </div>
           <p style="margin:4px 0 6px; font-size:12.5px;">${isAr ? p.descriptionAr : p.description}</p>
           <div style="font-size:11.5px; color:#64748B;">
-            <b>${isAr ? 'الافتراضات الحاكمة:' : isFr ? 'Hypothèses :' : 'Assumptions:'}</b> ${p.assumptions.map(a => `• ${a}`).join(' ')}
+            <b>${isAr ? 'الافتراضات الحاكمة:' : isFr ? 'Hypothèses :' : 'Assumptions:'}</b> ${(isAr ? p.assumptionsAr : p.assumptions).map(a => `• ${a}`).join(' ')}
           </div>
           <div style="margin-top:6px; font-size:12px; font-weight:bold; color:#0369A1;">
             ${isAr

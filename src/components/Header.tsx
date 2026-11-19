@@ -6,7 +6,8 @@
 
 import React from 'react';
 import { SectorKey, WilayaRecord } from '../types';
-import { Globe, Search, Sparkles, FileText, Bot, Upload, AlertTriangle } from 'lucide-react';
+import { Globe, Sparkles, FileText, Monitor } from 'lucide-react';
+import logoSvg from '../../assets/logo.svg';
 
 interface HeaderProps {
   currentSector: SectorKey;
@@ -20,6 +21,7 @@ interface HeaderProps {
   onToggleLang: () => void;
   onQuickAiDiagnosis: () => void;
   onOpenReport: () => void;
+  onOpenPortable: () => void;
   onNavigateTab: (tabId: string) => void;
 }
 
@@ -35,6 +37,7 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleLang,
   onQuickAiDiagnosis,
   onOpenReport,
+  onOpenPortable,
   onNavigateTab
 }) => {
   const isAr = lang === 'ar';
@@ -45,7 +48,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Brand Block */}
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => onNavigateTab('map')}>
           <img
-            src="/assets/logo.svg"
+            src={logoSvg}
             alt="gis_map logo"
             className="w-11 h-11 object-contain drop-shadow-md transition-transform hover:scale-105"
             onError={(e) => {
@@ -139,6 +142,16 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <FileText className="w-3.5 h-3.5 text-sky-400" />
             <span>{isAr ? 'تقرير استراتيجي' : 'Report / تقرير'}</span>
+          </button>
+
+          {/* Portable Desktop Version Button */}
+          <button
+            onClick={onOpenPortable}
+            className="flex items-center gap-1.5 bg-[#101D38] hover:bg-emerald-950/60 text-emerald-300 border border-emerald-500/35 font-bold text-xs px-3 py-1.5 rounded-lg transition cursor-pointer"
+            title={isAr ? 'تنزيل أو تثبيت نسخة سطح المكتب المحمولة' : 'Download or install Portable Desktop Edition'}
+          >
+            <Monitor className="w-3.5 h-3.5 text-emerald-400" />
+            <span>{isAr ? 'نسخة بورتابل' : 'Portable Desktop'}</span>
           </button>
 
           {/* Language Toggle */}

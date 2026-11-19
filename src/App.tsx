@@ -21,6 +21,9 @@ import { EarlyWarningDashboard } from './components/EarlyWarningDashboard';
 import { Foresight2030Dashboard } from './components/Foresight2030Dashboard';
 import { DataImportStudio } from './components/DataImportStudio';
 import { ReportModal } from './components/ReportModal';
+import { PortableDesktopModal } from './components/PortableDesktopModal';
+import { useOnlineStatus } from './hooks/usePWAInstall';
+import bannerSvg from '../assets/banner.svg';
 
 export default function App() {
   const [wilayas, setWilayas] = useState<WilayaRecord[]>(INITIAL_WILAYAS);
@@ -33,7 +36,9 @@ export default function App() {
   const [lang, setLang] = useState<'ar' | 'en'>('en');
   const [activeTab, setActiveTab] = useState<string>('map');
   const [isReportOpen, setIsReportOpen] = useState<boolean>(false);
+  const [isPortableOpen, setIsPortableOpen] = useState<boolean>(false);
   const [mapFocusRequest, setMapFocusRequest] = useState<{ wilayaNum: number; ts: number } | null>(null);
+  const isOnline = useOnlineStatus();
 
   // Sync document direction and language with state
   useEffect(() => {
@@ -78,6 +83,7 @@ export default function App() {
         onToggleLang={() => setLang(l => (l === 'ar' ? 'en' : 'ar'))}
         onQuickAiDiagnosis={handleQuickAiDiagnosis}
         onOpenReport={() => setIsReportOpen(true)}
+        onOpenPortable={() => setIsPortableOpen(true)}
         onNavigateTab={setActiveTab}
       />
 
@@ -87,7 +93,7 @@ export default function App() {
           {/* Main Hero Banner Image */}
           <div className="relative rounded-xl overflow-hidden border border-white/10 bg-[#070D1B]">
             <img
-              src="/assets/banner.svg"
+              src={bannerSvg}
               alt="gis_map — Geo-Intelligence for Algeria"
               className="w-full h-auto max-h-[220px] sm:max-h-[260px] md:max-h-[290px] object-cover sm:object-contain object-left md:object-center"
             />
@@ -187,6 +193,7 @@ export default function App() {
             wilayas={wilayas}
             selectedWilaya={selectedWilaya}
             onSelectWilaya={setSelectedWilaya}
+            onViewOnMap={handleViewWilayaOnMap}
             lang={lang}
           />
         )}
@@ -236,6 +243,7 @@ export default function App() {
             wilayas={wilayas}
             targetYear={targetYear}
             onSelectWilaya={setSelectedWilaya}
+            onViewOnMap={handleViewWilayaOnMap}
             lang={lang}
           />
         )}
@@ -259,6 +267,25 @@ export default function App() {
         targetYear={targetYear}
         initialLang={lang}
       />
+
+      {/* Portable Desktop Edition Modal */}
+      <PortableDesktopModal
+        isOpen={isPortableOpen}
+        onClose={() => setIsPortableOpen(false)}
+        lang={lang}
+      />
+
+      {/* Offline Connectivity Indicator */}
+      {!isOnline && (
+        <div className="fixed bottom-4 left-4 z-[900] flex items-center gap-2 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-slate-950 shadow-lg">
+          <span className="h-2 w-2 rounded-full bg-slate-950 animate-pulse" />
+          <span>
+            {isAr
+              ? 'وضع العمل دون اتصال — المحركات الكمية والبيانات الولائية تعمل محلياً'
+              : 'Offline Mode — Local models & 58-wilaya data active'}
+          </span>
+        </div>
+      )}
 
       {/* 6. Official Footer */}
       <footer className="bg-[#050A14] border-t border-white/10 px-4 py-6 text-center text-xs text-slate-400 space-y-2 mt-auto">

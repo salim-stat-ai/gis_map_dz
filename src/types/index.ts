@@ -99,6 +99,7 @@ export interface MoranResult {
   zScore: number;
   pValue: number;
   interpretation: string;
+  interpretationAr?: string;
   isSignificant: boolean;
 }
 
@@ -143,6 +144,7 @@ export interface ScenarioPathway {
   description: string;
   descriptionAr: string;
   assumptions: string[];
+  assumptionsAr: string[];
   impacts: Record<number, ScenarioImpact>;
 }
 

@@ -221,7 +221,13 @@ export const ScenarioCenter: React.FC<ScenarioCenterProps> = ({
             >
               <div className="border-b border-white/10 pb-3">
                 <span className={`text-[11px] font-extrabold uppercase tracking-wider block ${titleColor}`}>
-                  {path.id}
+                  {isAr
+                    ? path.id === 'optimistic'
+                      ? 'المسار المتفائل'
+                      : path.id === 'pessimistic'
+                      ? 'المسار المتشائم'
+                      : 'المسار المرجعي'
+                    : path.id}
                 </span>
                 <h3 className="font-extrabold text-base text-white mt-0.5">
                   {isAr ? path.nameAr : path.name}
@@ -273,7 +279,7 @@ export const ScenarioCenter: React.FC<ScenarioCenterProps> = ({
               {/* Key Assumptions */}
               <div className="text-[11px] space-y-1 text-slate-400 border-t border-white/10 pt-3">
                 <span className="font-bold text-slate-300 block">{isAr ? 'الافتراضات الأساسية للمسار:' : 'Core Assumptions:'}</span>
-                {path.assumptions.map((a, i) => (
+                {(isAr ? path.assumptionsAr : path.assumptions).map((a, i) => (
                   <div key={i} className="flex items-start gap-1.5">
                     <span className="text-slate-500">•</span>
                     <span>{a}</span>

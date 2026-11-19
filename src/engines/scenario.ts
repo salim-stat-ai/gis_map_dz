@@ -108,6 +108,21 @@ export function generateAllPathways(
   w: WilayaRecord,
   customDrivers?: Partial<Record<'optimistic' | 'baseline' | 'pessimistic', Partial<ScenarioDriverSettings>>>
 ): ScenarioPathway[] {
+  const baseDrivers = {
+    ...DEFAULT_SCENARIO_DRIVERS.baseline,
+    ...(customDrivers?.baseline || {})
+  };
+  const optDrivers = {
+    ...DEFAULT_SCENARIO_DRIVERS.optimistic,
+    ...(customDrivers?.optimistic || {})
+  };
+  const pessDrivers = {
+    ...DEFAULT_SCENARIO_DRIVERS.pessimistic,
+    ...(customDrivers?.pessimistic || {})
+  };
+
+  const baseRainSign = baseDrivers.climateRainChangePct > 0 ? `+${baseDrivers.climateRainChangePct}%` : `${baseDrivers.climateRainChangePct}%`;
+
   const pathways: ScenarioPathway[] = [
     {
       id: 'optimistic',
@@ -116,15 +131,18 @@ export function generateAllPathways(
       description: 'Rapid deployment of seawater desalination plants, high-efficiency drip irrigation (85%), solar-powered pumps, and strict urban land zoning.',
       descriptionAr: 'دخول محطات تحلية مياه البحر الكبرى حيز الخدمة، تعميم السقي الذكي بالتقطير (85%)، كبح التوسع العشوائي نحو الأراضي الفلاحية.',
       assumptions: [
-        'Desalination capacity expands +650M m³/yr',
-        'Agricultural drip irrigation coverage reaches 85%',
+        `Desalination capacity expands +${optDrivers.desalinationCapexMillionM3}M m³/yr`,
+        `Agricultural drip irrigation coverage reaches ${optDrivers.irrigationEfficiencyPct}%`,
         'Strict cadastre zoning freezes construction in wadi flood beds',
         'Renewable energy integration reduces pumping costs'
       ],
-      impacts: simulateWilayaScenario(w, {
-        ...DEFAULT_SCENARIO_DRIVERS.optimistic,
-        ...(customDrivers?.optimistic || {})
-      })
+      assumptionsAr: [
+        `توسيع قدرات التحلية والتعبئة المائية بمقدار +${optDrivers.desalinationCapexMillionM3} مليون م³/سنة`,
+        `بلوغ كفاءة السقي الفلاحي بالتقطير والري الذكي ${optDrivers.irrigationEfficiencyPct}%`,
+        'تجميد البناء نهائياً داخل مجاري الأودية ومناطق الخطر الفيضاني بالمسح العقاري',
+        'دمج الطاقة الشمسية لخفض كلفة الضخ والتبريد الفلاحي'
+      ],
+      impacts: simulateWilayaScenario(w, optDrivers)
     },
     {
       id: 'baseline',
@@ -133,15 +151,18 @@ export function generateAllPathways(
       description: 'Moderate progress on ongoing hydraulic transfers, standard demographic growth (+1.6%/yr), gradual rainfall decline of -1.2% per year.',
       descriptionAr: 'استمرار وتيرة المشاريع الحالية دون طفرات هيكلية، نمو ديمغرافي منتظم، تراجع تدريجي في التساقطات المطرية بنسبة -1.2% سنوياً.',
       assumptions: [
-        'Planned public investment executes with historic lag factors',
-        'Moderate rainfall decline (-1.2%/yr) under Mediterranean climate shifts',
-        'Average agricultural water efficiency around 58%',
-        'Urban perimeter expands organically around existing trunk roads'
+        `Planned hydraulic & public investments add +${baseDrivers.desalinationCapexMillionM3}M m³ with historic lag`,
+        `Rainfall anomaly trend (${baseRainSign}/yr) under Mediterranean climate shifts`,
+        `Average agricultural water efficiency around ${baseDrivers.irrigationEfficiencyPct}%`,
+        `Urban perimeter expands at zoning strictness ${baseDrivers.urbanZoningStrictness}/100`
       ],
-      impacts: simulateWilayaScenario(w, {
-        ...DEFAULT_SCENARIO_DRIVERS.baseline,
-        ...(customDrivers?.baseline || {})
-      })
+      assumptionsAr: [
+        `تنفيذ الاستثمارات العمومية والتحويلات (+${baseDrivers.desalinationCapexMillionM3} مليون م³) بوتيرة تنفيذ تاريخية`,
+        `تغيّر التساقط السنوي (${baseRainSign}/سنة) مع النمو السكاني (+${baseDrivers.popGrowthRatePct}%)`,
+        `بقاء متوسط كفاءة استهلاك مياه الري الفلاحي في حدود ${baseDrivers.irrigationEfficiencyPct}%`,
+        `توسع المحيط العمراني وفق صرامة مخطط توجيهي (${baseDrivers.urbanZoningStrictness}/100) حول المحاور الطرقية`
+      ],
+      impacts: simulateWilayaScenario(w, baseDrivers)
     },
     {
       id: 'pessimistic',
@@ -150,15 +171,18 @@ export function generateAllPathways(
       description: 'Consecutive multi-year drought, groundwater over-extraction, delay in desalination infrastructure, and unmanaged urban sprawl.',
       descriptionAr: 'سنوات جفاف متتابعة، استنزاف مكثف للمياه الجوفية، تأخر تسليم المحطات الكبرى، وضغط عقاري حاد على الأحواض الزراعية.',
       assumptions: [
-        'Severe climate drying (-4.5% annual rainfall anomaly)',
+        `Severe climate drying (${pessDrivers.climateRainChangePct}% annual rainfall anomaly)`,
         'Unmetered well drilling exceeds natural aquifer recharge thresholds',
         'Speculative peri-urban sprawl pushes into flood-prone beds',
         'Agricultural yields drop up to 35% in rainfed cereal zones'
       ],
-      impacts: simulateWilayaScenario(w, {
-        ...DEFAULT_SCENARIO_DRIVERS.pessimistic,
-        ...(customDrivers?.pessimistic || {})
-      })
+      assumptionsAr: [
+        `موجات جفاف حادة وتراجع سنوي للأمطار بنسبة (${pessDrivers.climateRainChangePct}% سنوياً)`,
+        'حفر وضخ عشوائي من الآبار الجوفية يتجاوز عتبة التغذية الطبيعية',
+        'زحف عمراني ومضاربة عقارية نحو أراضي الأحواض ومجاري السيول',
+        'انخفاض مردودية الحبوب البعلية والزراعات المطرية حتى 35%'
+      ],
+      impacts: simulateWilayaScenario(w, pessDrivers)
     }
   ];
 

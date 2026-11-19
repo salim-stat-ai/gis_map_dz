@@ -6,6 +6,8 @@
 
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
+import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
@@ -212,6 +214,143 @@ app.post('/api/council/convene', (req, res) => {
     res.json({ success: true, council: councilDossier });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message || 'AI Council convention error' });
+  }
+});
+
+// Helper: Ensure single-file portable HTML exists
+function ensurePortableHtml(): string {
+  const portableHtmlPath = path.resolve(__dirname, 'dist-portable', 'index.html');
+  if (!fs.existsSync(portableHtmlPath)) {
+    execSync('npx vite build --config vite.portable.config.ts', {
+      cwd: __dirname,
+      stdio: 'pipe'
+    });
+  }
+  return portableHtmlPath;
+}
+
+// 11. GET /api/desktop/portable-html (Zero-install single self-contained HTML portable desktop app)
+app.get('/api/desktop/portable-html', (_req, res) => {
+  try {
+    const portableHtmlPath = ensurePortableHtml();
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="GIS-Map-Algeria-2030-Portable.html"');
+    res.sendFile(portableHtmlPath);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || 'Portable HTML build failed' });
+  }
+});
+
+// 12. GET /api/desktop/portable-zip (Full Portable Desktop Kit with OS App-Window Launchers + Electron template)
+app.get('/api/desktop/portable-zip', (_req, res) => {
+  try {
+    const portableHtmlPath = ensurePortableHtml();
+    const portableDir = path.resolve(__dirname, 'dist-portable');
+    const zipPath = path.resolve(portableDir, 'GIS-Map-Algeria-Desktop-Portable.zip');
+
+    // Write Windows Desktop App-Window Launcher (.bat)
+    const batLauncher = `@echo off
+title GIS Map - Algeria Geo-Intelligence 2030 (Portable Desktop)
+set "APP_FILE=%~dp0GIS-Map-Algeria-2030-Portable.html"
+set "URL_FILE=file:///%APP_FILE:\\=/%"
+
+:: Launch in dedicated App Window (no browser tabs/address bar) using Edge or Chrome if available
+if exist "%ProgramFiles(x86)%\\Microsoft\\Edge\\Application\\msedge.exe" (
+  start "" "%ProgramFiles(x86)%\\Microsoft\\Edge\\Application\\msedge.exe" --app="%URL_FILE%" --window-size=1440,920
+  exit /b
+)
+if exist "%ProgramFiles%\\Microsoft\\Edge\\Application\\msedge.exe" (
+  start "" "%ProgramFiles%\\Microsoft\\Edge\\Application\\msedge.exe" --app="%URL_FILE%" --window-size=1440,920
+  exit /b
+)
+if exist "%ProgramFiles%\\Google\\Chrome\\Application\\chrome.exe" (
+  start "" "%ProgramFiles%\\Google\\Chrome\\Application\\chrome.exe" --app="%URL_FILE%" --window-size=1440,920
+  exit /b
+)
+if exist "%LocalAppData%\\Google\\Chrome\\Application\\chrome.exe" (
+  start "" "%LocalAppData%\\Google\\Chrome\\Application\\chrome.exe" --app="%URL_FILE%" --window-size=1440,920
+  exit /b
+)
+
+:: Fallback to default browser
+start "" "%APP_FILE%"
+`;
+
+    // macOS launcher (.command)
+    const macLauncher = `#!/bin/bash
+DIR="$(cd "$(dirname "$0")" && pwd)"
+APP_FILE="$DIR/GIS-Map-Algeria-2030-Portable.html"
+if [ -d "/Applications/Google Chrome.app" ]; then
+  open -na "Google Chrome" --args --app="file://$APP_FILE"
+elif [ -d "/Applications/Microsoft Edge.app" ]; then
+  open -na "Microsoft Edge" --args --app="file://$APP_FILE"
+else
+  open "$APP_FILE"
+fi
+`;
+
+    // Linux launcher (.sh)
+    const linuxLauncher = `#!/usr/bin/env bash
+DIR="$(cd "$(dirname "$0")" && pwd)"
+APP_FILE="$DIR/GIS-Map-Algeria-2030-Portable.html"
+if command -v google-chrome >/dev/null 2>&1; then
+  google-chrome --app="file://$APP_FILE" >/dev/null 2>&1 &
+elif command -v microsoft-edge >/dev/null 2>&1; then
+  microsoft-edge --app="file://$APP_FILE" >/dev/null 2>&1 &
+elif command -v chromium >/dev/null 2>&1; then
+  chromium --app="file://$APP_FILE" >/dev/null 2>&1 &
+else
+  xdg-open "$APP_FILE"
+fi
+`;
+
+    const readmeTxt = `GIS MAP - ALGERIA GEO-INTELLIGENCE 2030 (PORTABLE DESKTOP EDITION)
+======================================================================
+
+[العربية - طريقة التشغيل الفوري بدون تثبيت]
+1) فك ضغط هذا المجلد في سطح المكتب أو على مفتاح USB.
+2) على ويندوز (Windows): انقر نقرتين على Start-GIS-Map-Desktop.bat ليفتح البرنامج في نافذة تطبيق مستقلة.
+   أو افتح مباشرة ملف GIS-Map-Algeria-2030-Portable.html بأي متصفح.
+3) على ماك (macOS): انقر على Start-GIS-Map-Desktop.command.
+4) على لينكس (Linux): شغّل Start-GIS-Map-Desktop.sh.
+5) جميع النماذج الكمية الـ12 وبيانات 58 ولاية والوكلاء السبعة والتقارير تعمل محلياً 100%.
+
+[Optional Native Electron Portable Binary (.exe / AppImage)]
+If you have Node.js installed locally and want a compiled native binary:
+  cd electron
+  npm install
+  npm run pack:win     # generates release/GIS-Map-Algeria-2030-Portable.exe
+  npm run pack:linux   # generates Linux AppImage
+`;
+
+    fs.writeFileSync(path.join(portableDir, 'Start-GIS-Map-Desktop.bat'), batLauncher.replace(/\n/g, '\r\n'));
+    fs.writeFileSync(path.join(portableDir, 'Start-GIS-Map-Desktop.command'), macLauncher, { mode: 0o755 });
+    fs.writeFileSync(path.join(portableDir, 'Start-GIS-Map-Desktop.sh'), linuxLauncher, { mode: 0o755 });
+    fs.writeFileSync(path.join(portableDir, 'README-PORTABLE-DESKTOP.txt'), readmeTxt);
+
+    // Build portable ZIP via Python stdlib zipfile (always available, zero extra deps)
+    const pyCmd = `python3 -c "
+import zipfile, os
+p = '${portableDir.replace(/\\/g, '/')}'
+root = '${__dirname.replace(/\\/g, '/')}'
+zpath = '${zipPath.replace(/\\/g, '/')}'
+with zipfile.ZipFile(zpath, 'w', zipfile.ZIP_DEFLATED) as z:
+    z.write('${portableHtmlPath.replace(/\\/g, '/')}', 'GIS-Map-Desktop-Portable/GIS-Map-Algeria-2030-Portable.html')
+    z.write(os.path.join(p, 'Start-GIS-Map-Desktop.bat'), 'GIS-Map-Desktop-Portable/Start-GIS-Map-Desktop.bat')
+    z.write(os.path.join(p, 'Start-GIS-Map-Desktop.command'), 'GIS-Map-Desktop-Portable/Start-GIS-Map-Desktop.command')
+    z.write(os.path.join(p, 'Start-GIS-Map-Desktop.sh'), 'GIS-Map-Desktop-Portable/Start-GIS-Map-Desktop.sh')
+    z.write(os.path.join(p, 'README-PORTABLE-DESKTOP.txt'), 'GIS-Map-Desktop-Portable/README-PORTABLE-DESKTOP.txt')
+    z.write(os.path.join(root, 'desktop-portable', 'main.cjs'), 'GIS-Map-Desktop-Portable/electron/main.cjs')
+    z.write(os.path.join(root, 'desktop-portable', 'package.json'), 'GIS-Map-Desktop-Portable/electron/package.json')
+    z.write('${portableHtmlPath.replace(/\\/g, '/')}', 'GIS-Map-Desktop-Portable/electron/GIS-Map-Algeria-2030-Portable.html')
+"`;
+    execSync(pyCmd, { cwd: __dirname, stdio: 'pipe' });
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', 'attachment; filename="GIS-Map-Algeria-Desktop-Portable.zip"');
+    res.sendFile(zipPath);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || 'Portable ZIP packaging failed' });
   }
 });
 

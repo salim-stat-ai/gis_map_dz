@@ -1,0 +1,40 @@
+{
+  "name": "gis-map-algeria-desktop",
+  "version": "2.0.0",
+  "description": "GIS Map – Geo-Intelligence & Quantitative Foresight for Algeria 2030 (Portable Desktop)",
+  "main": "main.cjs",
+  "author": "Salim Slimani",
+  "scripts": {
+    "start": "electron .",
+    "pack:win": "electron-builder --win portable",
+    "pack:linux": "electron-builder --linux AppImage",
+    "pack:mac": "electron-builder --mac zip"
+  },
+  "build": {
+    "appId": "dz.gismap.foresight2030",
+    "productName": "GIS Map Algeria 2030",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.cjs",
+      "GIS-Map-Algeria-2030-Portable.html"
+    ],
+    "win": {
+      "target": ["portable"],
+      "artifactName": "GIS-Map-Algeria-2030-Portable.exe"
+    },
+    "linux": {
+      "target": ["AppImage"],
+      "category": "Science"
+    },
+    "mac": {
+      "target": ["zip"],
+      "category": "public.app-category.education"
+    }
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^26.0.0"
+  }
+}
