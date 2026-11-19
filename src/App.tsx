@@ -71,7 +71,7 @@ export default function App() {
         onSectorChange={setCurrentSector}
         selectedWilaya={selectedWilaya}
         wilayas={wilayas}
-        onSelectWilaya={setSelectedWilaya}
+        onSelectWilaya={handleViewWilayaOnMap}
         targetYear={targetYear}
         onYearChange={setTargetYear}
         lang={lang}
