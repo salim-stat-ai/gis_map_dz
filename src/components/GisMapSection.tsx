@@ -8,7 +8,22 @@ import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import { Chart as ChartJS, registerables } from 'chart.js';
 import { SectorKey, WilayaRecord } from '../types';
-import { Info, MapPin, Layers, Droplets, ShieldAlert, TrendingUp, Compass, CheckCircle, Globe, FileText } from 'lucide-react';
+import {
+  ALL_18_INDICATORS,
+  calcNatAvg,
+  calcRankOf,
+  vsAvgText,
+  predictWater,
+  cropRisk,
+  urbanGrowth,
+  industryScore,
+  riskOf,
+  riskLabel,
+  generateActionPlan,
+  suitabilityAgri
+} from '../engines/reporting';
+import { classifyWilayaGeoZone, scanNationalEarlyWarnings } from '../engines/earlyWarning';
+import { Info, MapPin, Layers, Droplets, ShieldAlert, TrendingUp, Compass, CheckCircle, Globe, FileText, X, BarChart3, Activity } from 'lucide-react';
 
 ChartJS.register(...registerables);
 
@@ -119,6 +134,13 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
   });
   const [showAnomalies, setShowAnomalies] = useState<boolean>(true);
   const [actionAlert, setActionAlert] = useState<string | null>(null);
+  const [dossierWilaya, setDossierWilaya] = useState<WilayaRecord | null>(null);
+
+  useEffect(() => {
+    if (!dossierWilaya) return;
+    const fresh = wilayas.find(w => w.num === dossierWilaya.num);
+    if (fresh) setDossierWilaya(fresh);
+  }, [wilayas, dossierWilaya]);
 
   // Sector color function
   const getColorBySector = (w: WilayaRecord, sector: SectorKey): string => {
@@ -235,23 +257,67 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
         weight: selectedWilaya.num === w.num ? 4 : 2
       }).addTo(map);
 
+      const geo = classifyWilayaGeoZone(w);
+      const pw = predictWater(w, targetYear);
+      const cr = cropRisk(w, targetYear);
+      const ug = urbanGrowth(w, targetYear);
+      const indScore = industryScore(w);
+      const lv = riskOf(w, targetYear);
+      const rLab = riskLabel(lv, isAr ? 'ar' : 'en');
+      const covGap = Math.max(0, 100 - w.coverage);
+
       const popupContent = `
-        <div style="font-family: inherit; direction: ${isAr ? 'rtl' : 'ltr'}; text-align: ${isAr ? 'right' : 'left'}">
-          <b style="font-size: 14px; color: #38BDF8;">${w.num}. ${isAr ? w.n : w.en}</b>
-          <div style="font-size: 11px; color: #94A3B8; margin-top: 2px;">${isAr ? `السكان: ${w.pop} ألف | التساقط: ${w.rain} ملم` : `Pop: ${w.pop}k | Rain: ${w.rain}mm`}</div>
-          <div style="font-size: 11px; font-weight: bold; margin-top: 4px; color: ${c}">
-            ${currentSector === 'water' ? (isAr ? `العجز المائي: ${w.waterDef}` : `Water Deficit: ${w.waterDef}`)
-              : currentSector === 'agri' ? `NDVI: ${w.ndvi} | Soil: ${w.soil}/100`
-              : currentSector === 'realestate' ? `${w.price.toLocaleString()} DZD/m²`
-              : (isAr ? `تقييم القطاع: مناسب` : `Sector Rating: Evaluated`)}
+        <div
+          data-wilaya-card="${w.num}"
+          style="font-family: inherit; direction: ${isAr ? 'rtl' : 'ltr'}; text-align: ${isAr ? 'right' : 'left'}; min-width: 265px; max-width: 310px; cursor: pointer;"
+          title="${isAr ? 'اضغط لعرض كل المعلومات التفصيلية للولاية' : 'Click to open full wilaya dossier'}"
+        >
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; border-bottom:1px solid rgba(255,255,255,0.12); padding-bottom:6px; margin-bottom:6px;">
+            <div>
+              <b style="font-size: 14px; color: #38BDF8;">${w.num}. ${isAr ? w.n : w.en}</b>
+              <div style="font-size: 10px; color: #94A3B8;">${isAr ? w.en : w.n} · ${isAr ? geo.labelAr : geo.label}</div>
+            </div>
+            <span style="font-size:10px; font-weight:700; padding:2px 6px; border-radius:6px; background:rgba(255,255,255,0.08); color:${c}; white-space:nowrap;">${rLab}</span>
           </div>
-          ${anom && showAnomalies ? `<div style="margin-top: 4px; font-size: 11px; color: #F59E0B; background: rgba(245,158,11,0.1); padding: 4px; border-radius: 4px;">⚠️ ${anom}</div>` : ''}
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px 10px; font-size:11px; color:#CBD5E1; line-height:1.45;">
+            <div>👥 ${isAr ? 'السكان:' : 'Pop:'} <b style="color:#fff;">${w.pop.toLocaleString()}k</b></div>
+            <div>🏠 ${isAr ? 'العقار:' : 'Price:'} <b style="color:#fff;">${(w.price / 1000).toFixed(0)}k DZD</b></div>
+            <div>💧 ${isAr ? `مياه ${targetYear}:` : `Water ${targetYear}:`} <b style="color:${pw < -150 ? '#F87171' : '#38BDF8'};">${pw}</b></div>
+            <div>🌧️ ${isAr ? 'الأمطار:' : 'Rain:'} <b style="color:#fff;">${w.rain} mm</b></div>
+            <div>🌾 ${isAr ? 'التربة / NDVI:' : 'Soil / NDVI:'} <b style="color:#34D399;">${w.soil} / ${w.ndvi.toFixed(2)}</b></div>
+            <div>🏜️ ${isAr ? 'جفاف:' : 'Drought:'} <b style="color:#FBBF24;">${cr}%</b></div>
+            <div>🌊 ${isAr ? 'فيضان:' : 'Flood:'} <b style="color:#F87171;">${Math.round(w.flood * 100)}%</b></div>
+            <div>🏗️ ${isAr ? 'توسع:' : 'Urban:'} <b style="color:#fff;">+${ug}%</b></div>
+            <div>🛒 ${isAr ? 'التغطية:' : 'Coverage:'} <b style="color:#fff;">${w.coverage}% (-${covGap}%)</b></div>
+            <div>🏭 ${isAr ? 'صناعة:' : 'Industry:'} <b style="color:#A78BFA;">${indScore}/100</b></div>
+            <div>🧱 ${isAr ? 'السدود/الآبار:' : 'Dams/Wells:'} <b style="color:#fff;">${w.dams} / ${w.wells}</b></div>
+            <div>⚡ ${isAr ? 'طاقة/طرق:' : 'Power/Roads:'} <b style="color:#fff;">${w.energy}/${w.roads}</b></div>
+          </div>
+
+          ${anom && showAnomalies ? `<div style="margin-top: 6px; font-size: 10.5px; color: #FBBF24; background: rgba(245,158,11,0.12); padding: 4px 6px; border-radius: 5px;">⚠️ ${anom}</div>` : ''}
+
+          <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.1); text-align:center;">
+            <span style="display:inline-block; width:100%; background:linear-gradient(90deg, #0284C7, #10B981); color:#fff; font-weight:700; font-size:11px; padding:5px 8px; border-radius:6px;">
+              ${isAr ? '📋 اضغط لعرض كل المعلومات والتشخيص الكامل (18 مؤشراً)' : '📋 Click to view all wilaya details (18 indicators)'}
+            </span>
+          </div>
         </div>
       `;
 
-      marker.bindPopup(popupContent);
+      marker.bindPopup(popupContent, { maxWidth: 340 });
       marker.on('click', () => {
         onSelectWilaya(w);
+      });
+      marker.on('popupopen', (e) => {
+        const popupEl = e.popup.getElement();
+        const card = popupEl?.querySelector(`[data-wilaya-card="${w.num}"]`);
+        if (card) {
+          (card as HTMLElement).onclick = () => {
+            onSelectWilaya(w);
+            setDossierWilaya(w);
+          };
+        }
       });
 
       markersRef.current[w.en] = marker;
@@ -575,6 +641,7 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
   const retailGapCount = wilayas.filter(w => (100 - w.coverage) > 30).length;
 
   return (
+    <>
     <div className="max-w-7xl mx-auto px-4 py-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
       {/* Left Aside: Layer Controls & KPIs */}
       <aside className="lg:col-span-3 space-y-4">
@@ -954,6 +1021,15 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
 
           {/* Interactive Action Triggers */}
           <div className="space-y-1.5 pt-1">
+            <button
+              type="button"
+              onClick={() => setDossierWilaya(selectedWilaya)}
+              className="w-full text-center bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border border-white/20 text-xs px-3 py-2 rounded-lg font-bold shadow transition cursor-pointer flex items-center justify-center gap-2"
+            >
+              <BarChart3 className="w-3.5 h-3.5 text-emerald-100" />
+              <span>{isAr ? '📋 عرض كل معلومات الولاية (18 مؤشراً)' : '📋 View Full Wilaya Info (18 Indicators)'}</span>
+            </button>
+
             {onOpenReport && (
               <button
                 type="button"
@@ -1011,5 +1087,256 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
         </div>
       </aside>
     </div>
+
+    {/* Complete Wilaya Information Dossier Modal (Opened when clicking popup card or full info button) */}
+    {dossierWilaya && (() => {
+      const dw = dossierWilaya;
+      const dwGeo = classifyWilayaGeoZone(dw);
+      const dwRisk = riskOf(dw, targetYear);
+      const dwWaterPred = predictWater(dw, targetYear);
+      const dwCropRisk = cropRisk(dw, targetYear);
+      const dwUrbanGrowth = urbanGrowth(dw, targetYear);
+      const dwIndScore = industryScore(dw);
+      const dwAlerts = scanNationalEarlyWarnings(wilayas, targetYear, lang).filter(a => a.wilayaNum === dw.num);
+      const dwPlan = generateActionPlan(dw, targetYear, lang);
+      const histYears = dw.historicalYears ?? [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025];
+
+      return (
+        <div
+          className="fixed inset-0 z-[1000] flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md"
+          onClick={() => setDossierWilaya(null)}
+        >
+          <div
+            className="bg-[#0B152B] border border-white/15 rounded-2xl w-full max-w-5xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="bg-[#0E1B38] px-5 py-4 border-b border-white/10 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <MapPin className="w-5 h-5 text-sky-400" />
+                  <h2 className="text-lg sm:text-xl font-black text-white font-['Sora']">
+                    {dw.num}. {isAr ? `${dw.n} (${dw.en})` : `${dw.en} (${dw.n})`}
+                  </h2>
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                    {isAr ? dwGeo.labelAr : dwGeo.label}
+                  </span>
+                  <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-md ${
+                    dwRisk === 3 ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                      : dwRisk === 2 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                      : dwRisk === 1 ? 'bg-yellow-500/20 text-yellow-200 border border-yellow-500/40'
+                      : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                  }`}>
+                    {riskLabel(dwRisk, lang)}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  {isAr ? dwGeo.assetNoteAr : dwGeo.assetNote} · Lat {dw.lat}°, Lon {dw.lon}° · {isAr ? `أفق ${targetYear}` : `Horizon ${targetYear}`}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {onOpenReport && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDossierWilaya(null);
+                      onOpenReport();
+                    }}
+                    className="flex items-center gap-1.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition cursor-pointer"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>{isAr ? 'فتح التقرير القابل للطباعة' : 'Open Printable Report'}</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDossierWilaya(null);
+                    onNavigateTab('council');
+                  }}
+                  className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition cursor-pointer"
+                >
+                  <Activity className="w-3.5 h-3.5" />
+                  <span>{isAr ? 'مجلس الذكاء الاصطناعي' : 'AI Council'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDossierWilaya(null)}
+                  className="p-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Scroll Body */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-5 text-xs">
+              {/* Horizon Summary Strip */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div className="bg-[#121F3D] border border-white/10 rounded-xl p-3">
+                  <span className="text-[10px] text-slate-400 block">{isAr ? `العجز المائي ${targetYear}` : `Water Balance ${targetYear}`}</span>
+                  <b className={`text-lg font-mono ${dwWaterPred < -150 ? 'text-rose-400' : 'text-sky-400'}`}>{dwWaterPred}</b>
+                </div>
+                <div className="bg-[#121F3D] border border-white/10 rounded-xl p-3">
+                  <span className="text-[10px] text-slate-400 block">{isAr ? `خطر الجفاف ${targetYear}` : `Drought Risk ${targetYear}`}</span>
+                  <b className="text-lg font-mono text-amber-400">{dwCropRisk}%</b>
+                </div>
+                <div className="bg-[#121F3D] border border-white/10 rounded-xl p-3">
+                  <span className="text-[10px] text-slate-400 block">{isAr ? `التوسع العمراني ${targetYear}` : `Urban Growth ${targetYear}`}</span>
+                  <b className="text-lg font-mono text-emerald-400">+{dwUrbanGrowth}%</b>
+                </div>
+                <div className="bg-[#121F3D] border border-white/10 rounded-xl p-3">
+                  <span className="text-[10px] text-slate-400 block">{isAr ? 'الجاذبية الصناعية' : 'Industrial Score'}</span>
+                  <b className="text-lg font-mono text-purple-400">{dwIndScore}/100</b>
+                </div>
+                <div className="bg-[#121F3D] border border-white/10 rounded-xl p-3">
+                  <span className="text-[10px] text-slate-400 block">{isAr ? 'الملاءمة الفلاحية' : 'Agri Suitability'}</span>
+                  <b className="text-[11px] text-emerald-300 leading-tight block mt-1">{suitabilityAgri(dw, lang)}</b>
+                </div>
+              </div>
+
+              {/* All 18 Official Indicators Table */}
+              <div className="bg-[#0E1B38] border border-white/10 rounded-xl overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-white/10 flex items-center justify-between">
+                  <b className="text-sm text-white">
+                    {isAr ? 'جميع المؤشرات الرسمية للولاية (18 مؤشراً + الترتيب الوطني)' : 'Complete Wilaya Indicators (All 18 Metrics & National Ranking)'}
+                  </b>
+                  <span className="text-[11px] text-slate-400">{isAr ? `نطاق المقارنة: ${wilayas.length} ولاية` : `Benchmarked vs ${wilayas.length} wilayas`}</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-start border-collapse text-xs">
+                    <thead className="bg-[#091224] text-slate-400 text-[11px]">
+                      <tr>
+                        <th className="py-2 px-3 text-start">{isAr ? 'المؤشر' : 'Indicator'}</th>
+                        <th className="py-2 px-3 text-start">{isAr ? 'قيمة الولاية' : 'Wilaya Value'}</th>
+                        <th className="py-2 px-3 text-start">{isAr ? 'المتوسط الوطني' : 'Nat. Avg'}</th>
+                        <th className="py-2 px-3 text-start">{isAr ? 'الترتيب الوطني' : 'Rank'}</th>
+                        <th className="py-2 px-3 text-start">{isAr ? 'التقييم مقارنة بالمعدل' : 'Status vs Avg'}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {ALL_18_INDICATORS.map(ind => {
+                        const getter =
+                          ind.key === 'cropRisk'
+                            ? (x: WilayaRecord) => cropRisk(x, targetYear)
+                            : ind.key === 'urbanGrowth'
+                            ? (x: WilayaRecord) => urbanGrowth(x, targetYear)
+                            : ind.getValue;
+                        const val = getter(dw);
+                        const avg = calcNatAvg(wilayas, getter);
+                        const rank = calcRankOf(wilayas, dw, getter, !ind.invertStatus);
+                        const vsAvg = vsAvgText(val, avg, lang, ind.invertStatus);
+                        const formattedVal =
+                          ind.key === 'cropRisk' ? `${val}%` : ind.key === 'urbanGrowth' ? `+${val}%` : ind.format(dw);
+                        const labelName = isAr
+                          ? ind.nameAr.replace('2030', String(targetYear))
+                          : ind.nameEn.replace('2030', String(targetYear));
+
+                        return (
+                          <tr key={ind.key} className="hover:bg-white/5">
+                            <td className="py-2 px-3 font-semibold text-slate-200">{labelName}</td>
+                            <td className="py-2 px-3 font-mono font-bold text-white">{formattedVal}</td>
+                            <td className="py-2 px-3 font-mono text-slate-400">
+                              {ind.key === 'flood' ? `${Math.round(avg)}%` : ind.key === 'price' ? Math.round(avg).toLocaleString() : Math.round(avg * 10) / 10}
+                            </td>
+                            <td className="py-2 px-3 font-mono text-sky-300">{rank}</td>
+                            <td className="py-2 px-3 text-slate-300">{vsAvg}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Historical Series (2018-2025) */}
+              <div className="bg-[#0E1B38] border border-white/10 rounded-xl overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-white/10">
+                  <b className="text-sm text-white">
+                    {isAr ? 'السلاسل الزمنية التاريخية للولاية (2018–2025)' : 'Wilaya Historical Time Series (2018–2025)'}
+                  </b>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-center border-collapse text-[11px] font-mono">
+                    <thead className="bg-[#091224] text-slate-400">
+                      <tr>
+                        <th className="py-2 px-3 text-start font-sans">{isAr ? 'المتغير' : 'Metric'}</th>
+                        {histYears.map(y => <th key={y} className="py-2 px-2">{y}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      <tr>
+                        <td className="py-2 px-3 text-start font-sans text-sky-300 font-semibold">{isAr ? 'مؤشر المياه' : 'Water Index'}</td>
+                        {(dw.historicalWaterDef ?? Array(8).fill(dw.waterDef)).map((v, i) => <td key={i} className="py-2 px-2 text-slate-200">{v}</td>)}
+                      </tr>
+                      <tr>
+                        <td className="py-2 px-3 text-start font-sans text-emerald-300 font-semibold">{isAr ? 'الأمطار (mm)' : 'Rain (mm)'}</td>
+                        {(dw.historicalRain ?? Array(8).fill(dw.rain)).map((v, i) => <td key={i} className="py-2 px-2 text-slate-200">{Math.round(v)}</td>)}
+                      </tr>
+                      <tr>
+                        <td className="py-2 px-3 text-start font-sans text-amber-300 font-semibold">{isAr ? 'العقار (k DZD)' : 'Price (k DZD)'}</td>
+                        {(dw.historicalPrice ?? Array(8).fill(dw.price)).map((v, i) => <td key={i} className="py-2 px-2 text-slate-200">{Math.round(v / 1000)}k</td>)}
+                      </tr>
+                      <tr>
+                        <td className="py-2 px-3 text-start font-sans text-purple-300 font-semibold">{isAr ? 'السكان (k)' : 'Pop (k)'}</td>
+                        {(dw.historicalPop ?? Array(8).fill(dw.pop)).map((v, i) => <td key={i} className="py-2 px-2 text-slate-200">{Math.round(v)}</td>)}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Active Multi-Horizon Warnings & Action Plan */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="bg-[#0E1B38] border border-white/10 rounded-xl p-4 space-y-2.5">
+                  <b className="text-sm text-rose-300 block">
+                    {isAr ? `تنبيهات الإنذار المبكر وبروتوكولات الاستجابة (${dwAlerts.length})` : `Active Early Warning Protocols (${dwAlerts.length})`}
+                  </b>
+                  {dwAlerts.length === 0 ? (
+                    <p className="text-emerald-300 text-xs">{isAr ? 'لا توجد إنذارات حرجة مسجلة على هذه الولاية حالياً.' : 'No critical early warning alerts active for this wilaya.'}</p>
+                  ) : (
+                    dwAlerts.map(al => (
+                      <div key={al.id} className="bg-[#091224] border border-white/10 rounded-lg p-3 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <b className="text-white">{al.metric}</b>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-300">{al.severity} ({al.currentValue})</span>
+                        </div>
+                        {al.protocols && (
+                          <div className="space-y-1 text-[11px] text-slate-300">
+                            <div><b className="text-emerald-400">{isAr ? 'قصير:' : 'Short:'}</b> {isAr ? al.protocols.shortTermAr : al.protocols.shortTerm}</div>
+                            <div><b className="text-sky-400">{isAr ? 'متوسط:' : 'Med:'}</b> {isAr ? al.protocols.mediumTermAr : al.protocols.mediumTerm}</div>
+                            <div><b className="text-purple-400">{isAr ? 'طويل:' : 'Long:'}</b> {isAr ? al.protocols.longTermAr : al.protocols.longTerm}</div>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="bg-[#0E1B38] border border-white/10 rounded-xl p-4 space-y-2.5">
+                  <b className="text-sm text-emerald-300 block">
+                    {isAr ? `خطة العمل القطاعية المرقمة (${targetYear})` : `Sectoral Operational Action Plan (${targetYear})`}
+                  </b>
+                  <div className="space-y-2">
+                    {dwPlan.map((step, i) => (
+                      <div key={i} className="bg-[#091224] border border-white/10 rounded-lg p-2.5 space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-sky-500/20 text-sky-300">{step.priority}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">{step.horizon} · {step.owner}</span>
+                        </div>
+                        <p className="text-slate-200 font-medium">{step.action}</p>
+                        <p className="text-[11px] text-emerald-400">{step.impact}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    })()}
+    </>
   );
 };
