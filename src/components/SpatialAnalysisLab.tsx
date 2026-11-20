@@ -678,7 +678,7 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
         </div>
 
         {/* 6 Sub-Tabs */}
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar mt-5 pt-3 border-t border-white/10">
+        <div className="flex items-center gap-2 overflow-x-auto nav-scrollbar pb-2 mt-5 pt-3 border-t border-white/10">
           <button
             type="button"
             onClick={() => setActiveSubTab('autocorrelation')}

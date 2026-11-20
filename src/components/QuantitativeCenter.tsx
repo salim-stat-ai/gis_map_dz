@@ -451,7 +451,7 @@ export const QuantitativeCenter: React.FC<QuantitativeCenterProps> = ({
         </div>
 
         {/* Model Tabs Selection */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar mt-5 pt-3 border-t border-white/10">
+        <div className="flex items-center gap-1.5 overflow-x-auto nav-scrollbar pb-2 mt-5 pt-3 border-t border-white/10">
           {modelsList.map(m => (
             <button
               key={m.id}
