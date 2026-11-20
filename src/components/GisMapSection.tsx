@@ -20,7 +20,14 @@ import {
   riskOf,
   riskLabel,
   generateActionPlan,
-  suitabilityAgri
+  suitabilityAgri,
+  getHospitalsCount,
+  getHealthCoverage,
+  getSeismicRisk,
+  getWildfireRisk,
+  getHazardIndex,
+  hasRailAccess,
+  getTransportScore
 } from '../engines/reporting';
 import { classifyWilayaGeoZone, scanNationalEarlyWarnings } from '../engines/earlyWarning';
 import { Info, MapPin, Layers, Droplets, ShieldAlert, TrendingUp, Compass, CheckCircle, Globe, FileText, X, BarChart3, Activity } from 'lucide-react';
@@ -114,6 +121,7 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersRef = useRef<Record<string, L.CircleMarker>>({});
+  const overlayGroupRef = useRef<L.LayerGroup | null>(null);
 
   const chartWaterRef = useRef<HTMLCanvasElement>(null);
   const chartRadarRef = useRef<HTMLCanvasElement>(null);
@@ -130,7 +138,10 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
     agri: true,
     water: true,
     commerce: true,
-    industry: true
+    industry: true,
+    health: true,
+    hazards: true,
+    transport: true
   });
   const [showAnomalies, setShowAnomalies] = useState<boolean>(true);
   const [actionAlert, setActionAlert] = useState<string | null>(null);
@@ -161,6 +172,18 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
       const ind = Math.round(w.energy * 0.3 + w.roads * 0.3 + w.labor * 0.2 + (100 - Math.abs(w.waterDef)) * 0.2);
       return ind > 70 ? '#10B981' : ind > 55 ? '#F59E0B' : '#EF4444';
     }
+    if (sector === 'health') {
+      const hc = getHealthCoverage(w);
+      return hc >= 72 ? '#10B981' : hc >= 50 ? '#F59E0B' : '#EF4444';
+    }
+    if (sector === 'hazards') {
+      const hz = getHazardIndex(w);
+      return hz >= 58 ? '#EF4444' : hz >= 38 ? '#F59E0B' : '#10B981';
+    }
+    if (sector === 'transport') {
+      const tr = getTransportScore(w);
+      return tr >= 72 ? '#10B981' : tr >= 50 ? '#F59E0B' : '#EF4444';
+    }
     // Overall composite
     const risks = [
       w.waterDef < -20 ? 1 : 0,
@@ -178,6 +201,9 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
     if (sector === 'commerce') return Math.min(26, 8 + w.pop / 140);
     if (sector === 'realestate') return Math.min(26, 8 + w.price / 14000);
     if (sector === 'agri') return Math.min(26, 8 + w.ndvi * 24);
+    if (sector === 'health') return Math.min(26, 7 + getHospitalsCount(w) * 0.48 + (100 - getHealthCoverage(w)) * 0.08);
+    if (sector === 'hazards') return Math.min(26, 7 + getHazardIndex(w) * 0.22);
+    if (sector === 'transport') return Math.min(26, 7 + getTransportScore(w) * 0.18);
     return Math.min(26, 10 + w.industry * 0.2);
   };
 
@@ -235,7 +261,7 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
     }).addTo(map);
   }, [currentBasemap]);
 
-  // Update Markers
+  // Update Markers & Interactive GIS Layer Overlays
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
@@ -243,6 +269,85 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
     // Clear old markers
     Object.values(markersRef.current).forEach(m => map.removeLayer(m));
     markersRef.current = {};
+
+    // Rebuild interactive vector overlays (Transport corridors, Natural Hazard rings, Health hubs)
+    if (overlayGroupRef.current) {
+      map.removeLayer(overlayGroupRef.current);
+      overlayGroupRef.current = null;
+    }
+    const overlayGroup = L.layerGroup();
+    const byNum = new Map<number, WilayaRecord>(wilayas.map(x => [x.num, x]));
+
+    // 1. Transport Layer Overlay: National Rail & Highway Corridors
+    if (activeLayers.transport || currentSector === 'transport') {
+      const corridors: { nums: number[]; dashed?: string; color: string }[] = [
+        // East-West Highway & Northern Trunk Rail (Tlemcen - Oran - Chlef - Algiers - Setif - Constantine - Annaba)
+        { nums: [13, 22, 31, 48, 2, 44, 9, 16, 35, 10, 34, 19, 43, 25, 21, 23, 36], color: '#38BDF8' },
+        // Eastern Mining & Highlands Rail (Constantine - Batna - Biskra - Touggourt - Ouargla & Tebessa)
+        { nums: [25, 5, 7, 57, 55, 30], color: '#22D3EE', dashed: '5,5' },
+        { nums: [25, 24, 41, 12], color: '#22D3EE', dashed: '5,5' },
+        // High Plateaus & Central Trans-Saharan Axis (Algiers - Medea - Djelfa - Laghouat - Ghardaia - El Meniaa - In Salah - Tamanrasset)
+        { nums: [16, 26, 17, 3, 47, 58, 53, 11], color: '#0EA5E9', dashed: '6,5' },
+        // Western Mining & Desert Axis (Oran - Mascara - Saida - Naama - Bechar - Beni Abbes - Tindouf)
+        { nums: [31, 29, 20, 45, 8, 52, 37], color: '#38BDF8', dashed: '6,5' }
+      ];
+      corridors.forEach(corr => {
+        const pts: [number, number][] = [];
+        corr.nums.forEach(n => {
+          const rec = byNum.get(n);
+          if (rec) pts.push([rec.lat, rec.lon]);
+        });
+        if (pts.length >= 2) {
+          L.polyline(pts, {
+            color: corr.color,
+            weight: currentSector === 'transport' ? 3 : 1.8,
+            opacity: currentSector === 'transport' ? 0.78 : 0.42,
+            dashArray: corr.dashed,
+            interactive: false
+          }).addTo(overlayGroup);
+        }
+      });
+    }
+
+    // 2. Natural Hazards Overlay: Seismic, Flood & Wildfire Zone Halos
+    if (activeLayers.hazards || currentSector === 'hazards') {
+      wilayas.forEach(w => {
+        const hz = getHazardIndex(w);
+        if (hz >= 52) {
+          L.circleMarker([w.lat, w.lon], {
+            radius: Math.min(34, getSizeBySector(w, currentSector) + 7),
+            color: hz >= 65 ? '#EF4444' : '#F97316',
+            weight: currentSector === 'hazards' ? 2.2 : 1.5,
+            dashArray: '3,4',
+            fill: false,
+            opacity: currentSector === 'hazards' ? 0.9 : 0.6,
+            interactive: false
+          }).addTo(overlayGroup);
+        }
+      });
+    }
+
+    // 3. Health Layer Overlay: Tertiary CHU Medical Hubs & Underserved Deserts
+    if (activeLayers.health || currentSector === 'health') {
+      wilayas.forEach(w => {
+        const hc = getHealthCoverage(w);
+        const hosp = getHospitalsCount(w);
+        if (hosp >= 14 || hc < 45) {
+          L.circleMarker([w.lat, w.lon], {
+            radius: Math.min(31, getSizeBySector(w, currentSector) + 4),
+            color: hc < 45 ? '#F43F5E' : '#2DD4BF',
+            weight: currentSector === 'health' ? 2.2 : 1.5,
+            dashArray: hc < 45 ? '2,4' : undefined,
+            fill: false,
+            opacity: currentSector === 'health' ? 0.88 : 0.55,
+            interactive: false
+          }).addTo(overlayGroup);
+        }
+      });
+    }
+
+    overlayGroup.addTo(map);
+    overlayGroupRef.current = overlayGroup;
 
     wilayas.forEach(w => {
       const c = getColorBySector(w, currentSector);
@@ -265,11 +370,18 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
       const lv = riskOf(w, targetYear);
       const rLab = riskLabel(lv, isAr ? 'ar' : 'en');
       const covGap = Math.max(0, 100 - w.coverage);
+      const hosp = getHospitalsCount(w);
+      const healthCov = getHealthCoverage(w);
+      const hazIdx = getHazardIndex(w);
+      const seisPct = Math.round(getSeismicRisk(w) * 100);
+      const firePct = Math.round(getWildfireRisk(w) * 100);
+      const trScore = getTransportScore(w);
+      const rail = hasRailAccess(w);
 
       const popupContent = `
         <div
           data-wilaya-card="${w.num}"
-          style="font-family: inherit; direction: ${isAr ? 'rtl' : 'ltr'}; text-align: ${isAr ? 'right' : 'left'}; min-width: 265px; max-width: 310px; cursor: pointer;"
+          style="font-family: inherit; direction: ${isAr ? 'rtl' : 'ltr'}; text-align: ${isAr ? 'right' : 'left'}; min-width: 220px; max-width: min(315px, 76vw); cursor: pointer;"
           title="${isAr ? 'اضغط لعرض كل المعلومات التفصيلية للولاية' : 'Click to open full wilaya dossier'}"
         >
           <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; border-bottom:1px solid rgba(255,255,255,0.12); padding-bottom:6px; margin-bottom:6px;">
@@ -291,7 +403,9 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
             <div>🏗️ ${isAr ? 'توسع:' : 'Urban:'} <b style="color:#fff;">+${ug}%</b></div>
             <div>🛒 ${isAr ? 'التغطية:' : 'Coverage:'} <b style="color:#fff;">${w.coverage}% (-${covGap}%)</b></div>
             <div>🏭 ${isAr ? 'صناعة:' : 'Industry:'} <b style="color:#A78BFA;">${indScore}/100</b></div>
-            <div>🧱 ${isAr ? 'السدود/الآبار:' : 'Dams/Wells:'} <b style="color:#fff;">${w.dams} / ${w.wells}</b></div>
+            <div>🏥 ${isAr ? 'الصحة:' : 'Health:'} <b style="color:#2DD4BF;">${healthCov}% (${hosp})</b></div>
+            <div>🌋 ${isAr ? 'أخطار(ز/ح):' : 'Hazards(S/F):'} <b style="color:#FB923C;">${hazIdx} (${seisPct}/${firePct}%)</b></div>
+            <div>🚆 ${isAr ? 'النقل/سكة:' : 'Transport:'} <b style="color:#38BDF8;">${trScore}/100 ${rail ? '🚆' : ''}</b></div>
             <div>⚡ ${isAr ? 'طاقة/طرق:' : 'Power/Roads:'} <b style="color:#fff;">${w.energy}/${w.roads}</b></div>
           </div>
 
@@ -299,7 +413,7 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
 
           <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.1); text-align:center;">
             <span style="display:inline-block; width:100%; background:linear-gradient(90deg, #0284C7, #10B981); color:#fff; font-weight:700; font-size:11px; padding:5px 8px; border-radius:6px;">
-              ${isAr ? '📋 اضغط لعرض كل المعلومات والتشخيص الكامل (18 مؤشراً)' : '📋 Click to view all wilaya details (18 indicators)'}
+              ${isAr ? '📋 اضغط لعرض كل المعلومات والتشخيص الكامل (21 مؤشراً)' : '📋 Click to view all wilaya details (21 indicators)'}
             </span>
           </div>
         </div>
@@ -322,7 +436,7 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
 
       markersRef.current[w.en] = marker;
     });
-  }, [wilayas, currentSector, targetYear, showAnomalies, isAr, selectedWilaya]);
+  }, [wilayas, currentSector, targetYear, showAnomalies, isAr, selectedWilaya, activeLayers]);
 
   // Center on selected wilaya & open popup (plus scroll into view when navigated from another tab)
   useEffect(() => {
@@ -639,12 +753,15 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
   const thirstRiskCount = wilayas.filter(w => (w.waterDef * 10 - (w.pop * 0.035 * horizon) * 0.15) < -20).length;
   const droughtRiskCount = wilayas.filter(w => (100 - (w.soil * 0.5 + w.rain * 0.06 + w.ndvi * 60) + horizon * 2.1) > 60).length;
   const retailGapCount = wilayas.filter(w => (100 - w.coverage) > 30).length;
+  const healthGapCount = wilayas.filter(w => getHealthCoverage(w) < 50).length;
+  const highHazardCount = wilayas.filter(w => getHazardIndex(w) >= 58).length;
+  const transportGapCount = wilayas.filter(w => getTransportScore(w) < 50).length;
 
   return (
     <>
-    <div className="max-w-7xl mx-auto px-4 py-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
-      {/* Left Aside: Layer Controls & KPIs */}
-      <aside className="lg:col-span-3 space-y-4">
+    <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
+      {/* Left Aside: Layer Controls & KPIs (shown after map on mobile for faster map access) */}
+      <aside className="order-2 lg:order-1 lg:col-span-3 space-y-4">
         {/* Layer Toggles */}
         <div className="bg-[#0D172E] border border-white/10 rounded-xl p-4 shadow-lg">
           <div className="flex items-center gap-2 mb-3 text-slate-200 font-bold text-sm">
@@ -701,6 +818,36 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
                 className="rounded accent-emerald-500"
               />
               <span>{isAr ? '🏭 الصناعة: الطاقة، الطرق، واليد العاملة' : '🏭 Industry: Energy, roads, labor'}</span>
+            </label>
+
+            <label className="flex items-center gap-2.5 cursor-pointer text-slate-300 hover:text-white">
+              <input
+                type="checkbox"
+                checked={activeLayers.health}
+                onChange={(e) => setActiveLayers({ ...activeLayers, health: e.target.checked })}
+                className="rounded accent-teal-400"
+              />
+              <span>{isAr ? '🏥 الصحة: المستشفيات والتغطية الطبية' : '🏥 Health: Hospitals & medical hubs'}</span>
+            </label>
+
+            <label className="flex items-center gap-2.5 cursor-pointer text-slate-300 hover:text-white">
+              <input
+                type="checkbox"
+                checked={activeLayers.hazards}
+                onChange={(e) => setActiveLayers({ ...activeLayers, hazards: e.target.checked })}
+                className="rounded accent-rose-500"
+              />
+              <span>{isAr ? '🌋 الأخطار الطبيعية: الزلازل، الفيضانات، الحرائق' : '🌋 Natural Hazards: Seismic, flood & wildfire'}</span>
+            </label>
+
+            <label className="flex items-center gap-2.5 cursor-pointer text-slate-300 hover:text-white">
+              <input
+                type="checkbox"
+                checked={activeLayers.transport}
+                onChange={(e) => setActiveLayers({ ...activeLayers, transport: e.target.checked })}
+                className="rounded accent-sky-400"
+              />
+              <span>{isAr ? '🚆 النقل: السكك الحديدية والمحاور الكبرى' : '🚆 Transport: Rail corridors & logistics'}</span>
             </label>
           </div>
 
@@ -826,22 +973,36 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
                 {isAr ? 'مناطق فجوة تجارية' : 'Retail-Gap Areas'}
               </span>
             </div>
+
+            <div className="bg-[#121F3D] p-2.5 rounded-lg border border-white/5">
+              <b className="text-base text-teal-400">{healthGapCount}</b>
+              <span className="block text-[10px] text-slate-400 leading-tight mt-0.5">
+                {isAr ? 'ولايات بحاجة لتغطية صحية' : 'Health-Gap Wilayas'}
+              </span>
+            </div>
+
+            <div className="bg-[#121F3D] p-2.5 rounded-lg border border-white/5">
+              <b className="text-base text-orange-400">{highHazardCount} / {transportGapCount}</b>
+              <span className="block text-[10px] text-slate-400 leading-tight mt-0.5">
+                {isAr ? 'خطر طبيعي / فجوة نقل' : 'High-Hazard / Rail-Gap'}
+              </span>
+            </div>
           </div>
         </div>
       </aside>
 
       {/* Center: Map Area */}
-      <section className="lg:col-span-6 bg-[#0D172E] border border-white/10 rounded-xl overflow-hidden shadow-2xl relative flex flex-col min-h-[550px] lg:min-h-[640px]">
+      <section className="order-1 lg:order-2 lg:col-span-6 bg-[#0D172E] border border-white/10 rounded-xl overflow-hidden shadow-2xl relative flex flex-col min-h-[390px] sm:min-h-[500px] lg:min-h-[640px]">
         {/* Floating Basemap Selector on Map */}
-        <div className="absolute top-3 right-3 z-[400] bg-[#070D1B]/95 backdrop-blur-md border border-white/15 rounded-lg p-1.5 shadow-xl flex items-center gap-1.5 text-xs">
-          <Globe className="w-3.5 h-3.5 text-emerald-400" />
-          <span className="text-[11px] text-slate-300 font-medium hidden sm:inline">
+        <div className="absolute top-2.5 right-2.5 z-[400] max-w-[calc(100%-3.75rem)] bg-[#070D1B]/95 backdrop-blur-md border border-white/15 rounded-lg p-1 sm:p-1.5 shadow-xl flex items-center gap-1.5 text-xs">
+          <Globe className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+          <span className="text-[11px] text-slate-300 font-medium hidden md:inline">
             {isAr ? 'خريطة الأساس:' : 'Basemap:'}
           </span>
           <select
             value={currentBasemap}
             onChange={(e) => setCurrentBasemap(e.target.value as BasemapKey)}
-            className="bg-[#0D172E] border border-white/20 text-slate-100 text-xs rounded px-2 py-1 outline-none focus:border-emerald-500 cursor-pointer"
+            className="bg-[#0D172E] border border-white/20 text-slate-100 text-[11px] sm:text-xs rounded px-1.5 sm:px-2 py-1 outline-none focus:border-emerald-500 cursor-pointer max-w-[155px] sm:max-w-[230px] truncate"
           >
             {BASEMAP_OPTIONS.map((b) => (
               <option key={b.key} value={b.key}>
@@ -849,7 +1010,7 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
               </option>
             ))}
           </select>
-          <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-semibold border border-emerald-500/30">
+          <span className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-semibold border border-emerald-500/30 whitespace-nowrap">
             {isAr ? 'مجاني بدون API' : 'Free / No Key'}
           </span>
         </div>
@@ -857,19 +1018,19 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
         <div ref={mapContainerRef} className="w-full flex-1 z-0" />
         
         {/* Map Bottom Hint */}
-        <div className="bg-[#0B1428]/90 border-t border-white/10 px-4 py-2 text-xs text-slate-300 flex items-center justify-between z-10 backdrop-blur-sm">
+        <div className="bg-[#0B1428]/90 border-t border-white/10 px-3 sm:px-4 py-2 text-xs text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2 z-10 backdrop-blur-sm">
           <div className="flex items-center gap-1.5">
-            <Compass className="w-4 h-4 text-emerald-400" />
+            <Compass className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>
               {isAr
                 ? `اضغط على أي ولاية على الخريطة لعرض التشخيص الاستشرافي والمخططات`
                 : 'Click any wilaya marker to view spatial diagnosis and forecast'}
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
             <button
               onClick={() => onNavigateTab('import')}
-              className="flex items-center gap-1 text-[11px] bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/30 px-2.5 py-0.5 rounded-lg cursor-pointer transition font-bold"
+              className="flex items-center gap-1 text-[11px] bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/30 px-2.5 py-1 rounded-lg cursor-pointer transition font-bold"
             >
               <span>📥</span>
               <span>{isAr ? 'استيراد بيانات الخريطة' : 'Import Map Data'}</span>
@@ -882,7 +1043,7 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
       </section>
 
       {/* Right Aside: Wilaya Detail Panel & Action Center */}
-      <aside className="lg:col-span-3 space-y-4">
+      <aside className="order-3 lg:col-span-3 space-y-4">
         <div className="bg-[#0D172E] border border-white/10 rounded-xl p-4 shadow-lg space-y-3">
           <div className="border-b border-white/10 pb-2">
             <div className="flex items-center justify-between">
@@ -920,6 +1081,22 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
             <div className="flex justify-between">
               <span>{isAr ? 'التغطية التجارية:' : 'Coverage:'}</span>
               <b>{selectedWilaya.coverage}%</b>
+            </div>
+            <div className="flex justify-between border-t border-white/5 pt-1 mt-1">
+              <span>{isAr ? '🏥 الصحة (المستشفيات):' : '🏥 Health (Hospitals):'}</span>
+              <b className="text-teal-300">{getHealthCoverage(selectedWilaya)}% ({getHospitalsCount(selectedWilaya)})</b>
+            </div>
+            <div className="flex justify-between">
+              <span>{isAr ? '🌋 الأخطار (زلزال/حرائق):' : '🌋 Hazards (Seis/Fire):'}</span>
+              <b className="text-orange-300">
+                {getHazardIndex(selectedWilaya)}/100 ({Math.round(getSeismicRisk(selectedWilaya) * 100)}%/{Math.round(getWildfireRisk(selectedWilaya) * 100)}%)
+              </b>
+            </div>
+            <div className="flex justify-between">
+              <span>{isAr ? '🚆 النقل والسكك الحديدية:' : '🚆 Transport & Rail:'}</span>
+              <b className="text-sky-300">
+                {getTransportScore(selectedWilaya)}/100 · {hasRailAccess(selectedWilaya) ? (isAr ? 'سكة حديدية' : 'Rail') : (isAr ? 'طريق بري' : 'Road')}
+              </b>
             </div>
           </div>
 
@@ -1147,7 +1324,7 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
               className="w-full text-center bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border border-white/20 text-xs px-3 py-2 rounded-lg font-bold shadow transition cursor-pointer flex items-center justify-center gap-2"
             >
               <BarChart3 className="w-3.5 h-3.5 text-emerald-100" />
-              <span>{isAr ? '📋 عرض كل معلومات الولاية (18 مؤشراً)' : '📋 View Full Wilaya Info (18 Indicators)'}</span>
+              <span>{isAr ? '📋 عرض كل معلومات الولاية (21 مؤشراً)' : '📋 View Full Wilaya Info (21 Indicators)'}</span>
             </button>
 
             {onOpenReport && (
@@ -1320,7 +1497,7 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
               <div className="bg-[#0E1B38] border border-white/10 rounded-xl overflow-hidden">
                 <div className="px-4 py-2.5 border-b border-white/10 flex items-center justify-between">
                   <b className="text-sm text-white">
-                    {isAr ? 'جميع المؤشرات الرسمية للولاية (18 مؤشراً + الترتيب الوطني)' : 'Complete Wilaya Indicators (All 18 Metrics & National Ranking)'}
+                    {isAr ? 'جميع المؤشرات الرسمية للولاية (21 مؤشراً + الترتيب الوطني)' : 'Complete Wilaya Indicators (All 21 Metrics & National Ranking)'}
                   </b>
                   <span className="text-[11px] text-slate-400">{isAr ? `نطاق المقارنة: ${wilayas.length} ولاية` : `Benchmarked vs ${wilayas.length} wilayas`}</span>
                 </div>

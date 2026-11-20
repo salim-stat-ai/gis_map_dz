@@ -16,7 +16,10 @@ import {
   AlertTriangle,
   CheckCircle,
   Compass,
-  Clock
+  Clock,
+  HeartPulse,
+  Flame,
+  Train
 } from 'lucide-react';
 
 interface EarlyWarningDashboardProps {
@@ -144,6 +147,27 @@ export const EarlyWarningDashboard: React.FC<EarlyWarningDashboardProps> = ({
             >
               <ShoppingBag className="w-3 h-3" />
               <span>{isAr ? 'فجوة تجارية' : 'Retail Gap'}</span>
+            </button>
+            <button
+              onClick={() => setCategoryFilter('health')}
+              className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center gap-1 ${categoryFilter === 'health' ? 'bg-teal-500 text-white' : 'text-slate-400 hover:text-white'}`}
+            >
+              <HeartPulse className="w-3 h-3" />
+              <span>{isAr ? 'الصحة' : 'Health'}</span>
+            </button>
+            <button
+              onClick={() => setCategoryFilter('hazards')}
+              className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center gap-1 ${categoryFilter === 'hazards' ? 'bg-red-600 text-white' : 'text-slate-400 hover:text-white'}`}
+            >
+              <Flame className="w-3 h-3" />
+              <span>{isAr ? 'أخطار طبيعية' : 'Hazards'}</span>
+            </button>
+            <button
+              onClick={() => setCategoryFilter('transport')}
+              className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center gap-1 ${categoryFilter === 'transport' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white'}`}
+            >
+              <Train className="w-3 h-3" />
+              <span>{isAr ? 'النقل' : 'Transport'}</span>
             </button>
             <button
               onClick={() => setCategoryFilter('anomaly')}

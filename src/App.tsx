@@ -67,7 +67,7 @@ export default function App() {
   const isAr = lang === 'ar';
 
   return (
-    <div className={`min-h-screen bg-[#070D1B] text-[#E2E8F0] flex flex-col font-['Cairo','Inter',sans-serif]`}>
+    <div className={`min-h-screen w-full overflow-x-hidden bg-[#070D1B] text-[#E2E8F0] flex flex-col font-['Cairo','Inter',sans-serif]`}>
       {/* 1. Header */}
       <Header
         currentSector={currentSector}
@@ -85,20 +85,20 @@ export default function App() {
       />
 
       {/* 2. Hero Banner (Faithful to legacy gis_map) */}
-      <div className="max-w-7xl mx-auto px-4 pt-3 pb-2 w-full">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 pt-3 pb-2 w-full">
         <div className="bg-[#0B152B]/85 border border-white/10 rounded-2xl p-2 sm:p-3 shadow-2xl backdrop-blur-md overflow-hidden">
           {/* Main Hero Banner Image */}
           <div className="relative rounded-xl overflow-hidden border border-white/10 bg-[#070D1B]">
             <img
               src={bannerSvg}
               alt="gis_map — Geo-Intelligence for Algeria"
-              className="w-full h-auto max-h-[220px] sm:max-h-[260px] md:max-h-[290px] object-cover sm:object-contain object-left md:object-center"
+              className="w-full h-auto max-h-[160px] sm:max-h-[230px] md:max-h-[280px] object-contain mx-auto"
             />
           </div>
 
           {/* Slogan & Sector Filter Pills Row */}
-          <div className="mt-2.5 flex flex-col md:flex-row md:items-center justify-between gap-3 px-1 text-xs text-slate-300">
-            <div className="leading-relaxed">
+          <div className="mt-2.5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 px-1 text-xs text-slate-300">
+            <div className="flex-1 min-w-0 leading-relaxed">
               <span className="font-extrabold text-white">
                 {isAr ? 'من الاستجابة للأزمات ← إلى الاستشراف الكمي 2030.' : 'From crisis response → to quantitative forecasting 2030.'}
               </span>{' '}
@@ -108,42 +108,60 @@ export default function App() {
             </div>
 
             {/* Sector Pills */}
-            <div className="flex flex-wrap items-center gap-1.5 shrink-0 text-xs">
+            <div className="flex flex-wrap items-center gap-1.5 w-full lg:w-auto lg:max-w-[56%] lg:justify-end text-[11px] sm:text-xs">
               <span
                 onClick={() => { setCurrentSector('all'); setActiveTab('map'); }}
-                className={`px-2.5 py-1 rounded-full border cursor-pointer transition font-medium ${currentSector === 'all' ? 'bg-sky-500/20 text-sky-400 border-sky-500/40' : 'bg-white/5 text-slate-400 border-white/10 hover:text-white'}`}
+                className={`whitespace-nowrap px-2.5 py-1 rounded-full border cursor-pointer transition font-medium ${currentSector === 'all' ? 'bg-sky-500/20 text-sky-400 border-sky-500/40' : 'bg-white/5 text-slate-400 border-white/10 hover:text-white'}`}
               >
                 🌐 {isAr ? 'الكل' : 'All'}
               </span>
               <span
                 onClick={() => { setCurrentSector('realestate'); setActiveTab('map'); }}
-                className={`px-2.5 py-1 rounded-full border cursor-pointer transition font-medium ${currentSector === 'realestate' ? 'bg-sky-500/20 text-sky-400 border-sky-500/40' : 'bg-white/5 text-slate-400 border-white/10 hover:text-white'}`}
+                className={`whitespace-nowrap px-2.5 py-1 rounded-full border cursor-pointer transition font-medium ${currentSector === 'realestate' ? 'bg-sky-500/20 text-sky-400 border-sky-500/40' : 'bg-white/5 text-slate-400 border-white/10 hover:text-white'}`}
               >
                 🏠 {isAr ? 'السكن' : 'Housing'}
               </span>
               <span
                 onClick={() => { setCurrentSector('agri'); setActiveTab('map'); }}
-                className={`px-2.5 py-1 rounded-full border cursor-pointer transition font-medium ${currentSector === 'agri' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' : 'bg-white/5 text-slate-400 border-white/10 hover:text-white'}`}
+                className={`whitespace-nowrap px-2.5 py-1 rounded-full border cursor-pointer transition font-medium ${currentSector === 'agri' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' : 'bg-white/5 text-slate-400 border-white/10 hover:text-white'}`}
               >
                 🌾 {isAr ? 'الفلاحة' : 'Farming'}
               </span>
               <span
                 onClick={() => { setCurrentSector('water'); setActiveTab('map'); }}
-                className={`px-2.5 py-1 rounded-full border cursor-pointer transition font-medium ${currentSector === 'water' ? 'bg-sky-500/20 text-sky-400 border-sky-500/40' : 'bg-white/5 text-slate-400 border-white/10 hover:text-white'}`}
+                className={`whitespace-nowrap px-2.5 py-1 rounded-full border cursor-pointer transition font-medium ${currentSector === 'water' ? 'bg-sky-500/20 text-sky-400 border-sky-500/40' : 'bg-white/5 text-slate-400 border-white/10 hover:text-white'}`}
               >
                 💧 {isAr ? 'المياه' : 'Water'}
               </span>
               <span
                 onClick={() => { setCurrentSector('commerce'); setActiveTab('map'); }}
-                className={`px-2.5 py-1 rounded-full border cursor-pointer transition font-medium ${currentSector === 'commerce' ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' : 'bg-white/5 text-slate-400 border-white/10 hover:text-white'}`}
+                className={`whitespace-nowrap px-2.5 py-1 rounded-full border cursor-pointer transition font-medium ${currentSector === 'commerce' ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' : 'bg-white/5 text-slate-400 border-white/10 hover:text-white'}`}
               >
                 🛒 {isAr ? 'التجارة' : 'Retail'}
               </span>
               <span
                 onClick={() => { setCurrentSector('industry'); setActiveTab('map'); }}
-                className={`px-2.5 py-1 rounded-full border cursor-pointer transition font-medium ${currentSector === 'industry' ? 'bg-purple-500/20 text-purple-400 border-purple-500/40' : 'bg-white/5 text-slate-400 border-white/10 hover:text-white'}`}
+                className={`whitespace-nowrap px-2.5 py-1 rounded-full border cursor-pointer transition font-medium ${currentSector === 'industry' ? 'bg-purple-500/20 text-purple-400 border-purple-500/40' : 'bg-white/5 text-slate-400 border-white/10 hover:text-white'}`}
               >
                 🏭 {isAr ? 'الصناعة' : 'Industry'}
+              </span>
+              <span
+                onClick={() => { setCurrentSector('health'); setActiveTab('map'); }}
+                className={`whitespace-nowrap px-2.5 py-1 rounded-full border cursor-pointer transition font-medium ${currentSector === 'health' ? 'bg-teal-500/20 text-teal-400 border-teal-500/40' : 'bg-white/5 text-slate-400 border-white/10 hover:text-white'}`}
+              >
+                🏥 {isAr ? 'الصحة' : 'Health'}
+              </span>
+              <span
+                onClick={() => { setCurrentSector('hazards'); setActiveTab('map'); }}
+                className={`whitespace-nowrap px-2.5 py-1 rounded-full border cursor-pointer transition font-medium ${currentSector === 'hazards' ? 'bg-rose-500/20 text-rose-400 border-rose-500/40' : 'bg-white/5 text-slate-400 border-white/10 hover:text-white'}`}
+              >
+                🌋 {isAr ? 'الأخطار الطبيعية' : 'Hazards'}
+              </span>
+              <span
+                onClick={() => { setCurrentSector('transport'); setActiveTab('map'); }}
+                className={`whitespace-nowrap px-2.5 py-1 rounded-full border cursor-pointer transition font-medium ${currentSector === 'transport' ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40' : 'bg-white/5 text-slate-400 border-white/10 hover:text-white'}`}
+              >
+                🚆 {isAr ? 'النقل' : 'Transport'}
               </span>
             </div>
           </div>

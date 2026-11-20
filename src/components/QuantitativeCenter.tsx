@@ -421,14 +421,14 @@ export const QuantitativeCenter: React.FC<QuantitativeCenterProps> = ({
           </div>
 
           {/* Wilaya & Metric Pickers */}
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2.5 w-full md:w-auto">
             <select
               value={selectedWilaya.num}
               onChange={(e) => {
                 const w = wilayas.find(x => x.num === Number(e.target.value));
                 if (w) onSelectWilaya(w);
               }}
-              className="bg-[#121F3D] text-slate-200 border border-white/15 rounded-lg px-3 py-2 text-xs font-bold cursor-pointer"
+              className="w-full sm:w-auto bg-[#121F3D] text-slate-200 border border-white/15 rounded-lg px-3 py-2 text-xs font-bold cursor-pointer"
             >
               {wilayas.map(w => (
                 <option key={w.num} value={w.num}>
@@ -440,7 +440,7 @@ export const QuantitativeCenter: React.FC<QuantitativeCenterProps> = ({
             <select
               value={selectedMetricKey}
               onChange={(e) => setSelectedMetricKey(e.target.value as any)}
-              className="bg-[#121F3D] text-slate-200 border border-white/15 rounded-lg px-3 py-2 text-xs font-bold cursor-pointer"
+              className="w-full sm:w-auto bg-[#121F3D] text-slate-200 border border-white/15 rounded-lg px-3 py-2 text-xs font-bold cursor-pointer"
             >
               <option value="waterDef">{isAr ? '💧 العجز المائي التراكمي' : '💧 Water Deficit Index'}</option>
               <option value="rain">{isAr ? '🌧️ التساقطات المطرية (ملم)' : '🌧️ Rainfall (mm)'}</option>
@@ -472,19 +472,19 @@ export const QuantitativeCenter: React.FC<QuantitativeCenterProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left: Forecast Chart */}
         <div className="lg:col-span-8 bg-[#0D172E] border border-white/10 rounded-2xl p-5 shadow-xl space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-emerald-400" />
-                <span>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span className="truncate">
                   {forecastResult?.targetMetric} — {isAr ? selectedWilaya.n : selectedWilaya.en}
                 </span>
               </h2>
-              <div className="text-xs text-slate-400 font-mono mt-0.5">
+              <div className="text-xs text-slate-400 font-mono mt-0.5 break-words">
                 {forecastResult?.equationDescription}
               </div>
             </div>
-            <span className="text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded font-mono font-bold">
+            <span className="text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded font-mono font-bold shrink-0">
               Horizon 2035
             </span>
           </div>

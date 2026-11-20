@@ -21,6 +21,7 @@ import {
   computeRegionalSummaries,
   computeProximityAnalysis
 } from '../engines/gis';
+import { getHazardIndex, getHealthCoverage, getTransportScore } from '../engines/reporting';
 import {
   Activity,
   Flame,
@@ -46,7 +47,18 @@ interface SpatialAnalysisLabProps {
   lang: 'ar' | 'en';
 }
 
-type SpatialMetricKey = 'waterDef' | 'rain' | 'price' | 'flood' | 'industry' | 'soil' | 'coverage' | 'pop';
+type SpatialMetricKey =
+  | 'waterDef'
+  | 'rain'
+  | 'price'
+  | 'flood'
+  | 'industry'
+  | 'soil'
+  | 'coverage'
+  | 'pop'
+  | 'healthCoverage'
+  | 'hazardIndex'
+  | 'transportScore';
 type SubTabKey = 'autocorrelation' | 'regression' | 'kde_kriging' | 'proximity' | 'regional_drilldown' | 'ahp';
 
 export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
@@ -117,6 +129,9 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
       if (activeSpatialMetric === 'soil') return w.soil;
       if (activeSpatialMetric === 'coverage') return w.coverage;
       if (activeSpatialMetric === 'pop') return w.pop;
+      if (activeSpatialMetric === 'healthCoverage') return getHealthCoverage(w);
+      if (activeSpatialMetric === 'hazardIndex') return getHazardIndex(w);
+      if (activeSpatialMetric === 'transportScore') return getTransportScore(w);
       return w.waterDef;
     };
   }, [activeSpatialMetric]);
@@ -130,7 +145,10 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
       industry: { en: 'Industry Score (/100)', ar: 'الجاذبية الصناعية (/100)' },
       soil: { en: 'Soil Quality (/100)', ar: 'خصوبة التربة (/100)' },
       coverage: { en: 'Market Coverage (%)', ar: 'التغطية التجارية (%)' },
-      pop: { en: 'Population (k)', ar: 'السكان (بالآلاف)' }
+      pop: { en: 'Population (k)', ar: 'السكان (بالآلاف)' },
+      healthCoverage: { en: 'Healthcare Coverage (%)', ar: 'التغطية الصحية (%)' },
+      hazardIndex: { en: 'Natural Hazard Index (/100)', ar: 'مؤشر الأخطار الطبيعية (/100)' },
+      transportScore: { en: 'Transport & Rail Score (/100)', ar: 'مؤشر النقل والسكك (/100)' }
     };
     return isAr ? labels[activeSpatialMetric].ar : labels[activeSpatialMetric].en;
   }, [activeSpatialMetric, isAr]);
@@ -636,13 +654,13 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
             </p>
           </div>
 
-          {/* Expanded 8-Metric Selector */}
-          <div className="flex flex-col sm:items-end gap-1.5 shrink-0">
+          {/* Expanded Metric Selector */}
+          <div className="flex flex-col sm:items-end gap-1.5 w-full md:w-auto">
             <span className="text-[11px] text-slate-400">{isAr ? 'المتغير المكاني النشط:' : 'Active Spatial Metric:'}</span>
             <select
               value={activeSpatialMetric}
               onChange={(e) => handleMetricSelect(e.target.value as SpatialMetricKey)}
-              className="bg-[#121F3D] text-slate-200 border border-white/15 rounded-lg px-3 py-2 text-xs font-bold cursor-pointer"
+              className="w-full md:w-auto bg-[#121F3D] text-slate-200 border border-white/15 rounded-lg px-3 py-2 text-xs font-bold cursor-pointer"
             >
               <option value="waterDef">{isAr ? '💧 العجز المائي (Water Deficit)' : '💧 Water Deficit Index'}</option>
               <option value="rain">{isAr ? '🌧️ التساقطات المطرية (Rainfall)' : '🌧️ Annual Rainfall (mm)'}</option>
@@ -652,6 +670,9 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
               <option value="soil">{isAr ? '🌱 خصوبة التربة (Soil Index)' : '🌱 Soil Fertility'}</option>
               <option value="coverage">{isAr ? '🛒 التغطية التجارية (Coverage %)' : '🛒 Retail Coverage %'}</option>
               <option value="pop">{isAr ? '👥 الكتلة السكانية (Population)' : '👥 Population (k)'}</option>
+              <option value="healthCoverage">{isAr ? '🏥 التغطية الصحية (Health %)' : '🏥 Healthcare Access %'}</option>
+              <option value="hazardIndex">{isAr ? '🌋 الأخطار الطبيعية (Natural Hazards)' : '🌋 Composite Natural Hazards'}</option>
+              <option value="transportScore">{isAr ? '🚆 النقل والربط متعدد الوسائط (Transport)' : '🚆 Multimodal Transport & Rail'}</option>
             </select>
           </div>
         </div>
@@ -1644,7 +1665,7 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
             <h3 className="text-xs font-bold text-slate-300 mb-2">
               {isAr ? 'الولايات الأكثر ملاءمة (انقر لعرض الموقع على الخريطة):' : 'Top Ranked Wilayas (Click to jump to Map):'}
             </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
               {ahpResult.rankedWilayas.slice(0, 10).map((item, idx) => (
                 <div
                   key={item.wilaya}

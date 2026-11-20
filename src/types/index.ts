@@ -4,7 +4,16 @@
  * © 2026 Salim Slimani & National Foresight System
  */
 
-export type SectorKey = 'all' | 'realestate' | 'agri' | 'water' | 'commerce' | 'industry';
+export type SectorKey =
+  | 'all'
+  | 'realestate'
+  | 'agri'
+  | 'water'
+  | 'commerce'
+  | 'industry'
+  | 'health'
+  | 'hazards'
+  | 'transport';
 
 export interface WilayaRecord {
   num: number;
@@ -28,6 +37,14 @@ export interface WilayaRecord {
   roads: number;    // road network connectivity 0 - 100
   labor: number;    // available active workforce index 0 - 100
   industry: number; // industrial suitability / activity index 0 - 100
+  // Extended Geo-Intelligence Layers (Health, Natural Hazards, Transport)
+  hospitals?: number;      // public hospitals & specialized medical facilities
+  healthCoverage?: number; // healthcare & bed capacity access index 0 - 100
+  seismicRisk?: number;    // seismic hazard exposure index 0 - 1
+  wildfireRisk?: number;   // forest wildfire risk index 0 - 1
+  hazardIndex?: number;    // composite natural hazard exposure 0 - 100
+  transportScore?: number; // multimodal roads + rail + hub score 0 - 100
+  railAccess?: boolean;    // connected to SNTF national railway network
   // Historical data for time series analysis (2018-2025)
   historicalYears?: number[];
   historicalRain?: number[];
@@ -223,7 +240,7 @@ export interface ProtocolHorizons {
 
 export interface EarlyWarningAlert {
   id: string;
-  category: 'water' | 'drought' | 'flood' | 'commerce' | 'industry' | 'anomaly';
+  category: 'water' | 'drought' | 'flood' | 'commerce' | 'industry' | 'health' | 'hazards' | 'transport' | 'anomaly';
   severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
   wilayaNum: number;
   wilayaEn: string;

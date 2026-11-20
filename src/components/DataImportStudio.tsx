@@ -397,7 +397,7 @@ export const DataImportStudio: React.FC<DataImportStudioProps> = ({
           <select
             value={selectedPreset}
             onChange={handleSelectPreset}
-            className="bg-[#121F3D] text-slate-200 border border-white/15 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-sky-400 max-w-xs"
+            className="w-full sm:w-auto sm:max-w-xs bg-[#121F3D] text-slate-200 border border-white/15 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-sky-400"
           >
             <option value="">🌍 Ready sources…</option>
 
@@ -427,7 +427,7 @@ export const DataImportStudio: React.FC<DataImportStudioProps> = ({
             value={importUrl}
             onChange={e => setImportUrl(e.target.value)}
             placeholder="https://…/data.csv (CSV, JSON, GeoJSON, KML)"
-            className="flex-1 min-w-[240px] bg-[#0A1224] text-slate-200 placeholder-slate-500 border border-white/15 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-sky-400"
+            className="w-full sm:flex-1 sm:min-w-[220px] bg-[#0A1224] text-slate-200 placeholder-slate-500 border border-white/15 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-sky-400"
           />
 
           {/* Fetch URL button */}

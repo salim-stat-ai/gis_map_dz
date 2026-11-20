@@ -14,11 +14,22 @@
     --accent-purple: #A78BFA;
   }
 
+  html,
   body {
     background-color: #070D1B;
     color: #E2E8F0;
     font-family: 'Cairo', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    overflow-x: clip;
+    max-width: 100%;
   }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Custom Leaflet Styling */
@@ -43,6 +54,13 @@
   margin: 12px 14px !important;
   line-height: 1.5 !important;
   font-size: 13px !important;
+}
+
+@media (max-width: 640px) {
+  .leaflet-popup-content {
+    margin: 10px 10px !important;
+    max-width: 78vw !important;
+  }
 }
 
 /* Scrollbar customization */

@@ -5,6 +5,15 @@
  */
 
 import { EarlyWarningAlert, GeoZoneId, ProtocolHorizons, WilayaRecord } from '../types';
+import {
+  getHazardIndex,
+  getHealthCoverage,
+  getHospitalsCount,
+  getSeismicRisk,
+  getTransportScore,
+  getWildfireRisk,
+  hasRailAccess
+} from './reporting';
 
 const COASTAL_WILAYAS = new Set([2, 6, 13, 15, 16, 18, 21, 23, 27, 31, 35, 36, 42, 46]);
 const TELL_BASIN_WILAYAS = new Set([9, 10, 22, 24, 25, 26, 29, 41, 43, 44, 48]);
@@ -453,6 +462,124 @@ export function scanNationalEarlyWarnings(
         suggestedAction: `[Short] ${p.shortTerm} [Medium] ${p.mediumTerm} [Long] ${p.longTerm}`,
         suggestedActionAr: `[قصير] ${p.shortTermAr} [متوسط] ${p.mediumTermAr} [طويل] ${p.longTermAr}`,
         protocols: p
+      });
+    }
+    // 6. Healthcare Access & Bed Capacity Gap
+    const healthCov = getHealthCoverage(w);
+    const hospitals = getHospitalsCount(w);
+    if (healthCov < 48) {
+      alerts.push({
+        id: `ew-health-${w.num}`,
+        category: 'health',
+        severity: healthCov < 36 ? 'CRITICAL' : 'HIGH',
+        wilayaNum: w.num,
+        wilayaEn: w.en,
+        wilayaAr: w.n,
+        geoZone: geo.id,
+        geoZoneLabel: geo.label,
+        geoZoneLabelAr: geo.labelAr,
+        regionalAssetNote: geo.assetNote,
+        regionalAssetNoteAr: geo.assetNoteAr,
+        metric: lang === 'ar' ? 'فجوة التغطية الصحية وقدرة المستشفيات' : 'Healthcare Access & Hospital Gap',
+        currentValue: `${healthCov}% (${hospitals})`,
+        criticalThreshold: '48%',
+        detectedAt: now,
+        calculationMethod: 'Sanitary Catchment Density × Bed Ratio (MSPRH Model)',
+        uncertaintyMargin: '± 4.0%',
+        suggestedAction: `[Short] Deploy mobile specialist telemedicine caravans & strengthen SAMU stabilization across ${hospitals} local facilities. [Medium] Commission a 120-bed regional EPH hospital & solar vaccine cold-chain hubs. [Long] Integrate digital CHU referral corridors and tele-radiology to eliminate evacuation delays.`,
+        suggestedActionAr: `[قصير] تسيير قوافل طبية متخصصة وعنصر التطبيب عن بُعد وتدعيم الاستعجالات عبر ${hospitals} مرفقاً حالياً. [متوسط] إنجاز مستشفى جهوي 120 سريراً وتجهيز سلسلة تبريد شمسية. [طويل] ربط رقمي مباشر مع المراكز الاستشفائية الجامعية لتصفير تأخر الإجلاء الصحي.`,
+        protocols: {
+          shortTerm: `Deploy mobile specialist telemedicine units & strengthen SAMU emergency triage across ${hospitals} local medical facilities.`,
+          shortTermAr: `إطلاق قوافل طبية متخصصة وتفعيل التطبيب عن بُعد وتدعيم فرق الاستعجالات الطبية عبر ${hospitals} هياكل صحية محلية.`,
+          mediumTerm: `Build a new 120-bed EPH surgical pole and equip peripheral polyclinics with solar backup & maternity wings.`,
+          mediumTermAr: `برمجة قطب استشفائي جديد (120 سريراً) وتجهيز العيادات الجوارية بالطاقة الشمسية وأجنحة الأمومة.`,
+          longTerm: `Establish regional CHU medical-cluster autonomy & drone/air-ambulance evacuation corridors (${geo.label}).`,
+          longTermAr: `إحداث قطب طبي جهوي مستقل وتأمين خطوط الإجلاء الجوي والرقمي التخصصي في إطار (${geo.labelAr}).`
+        }
+      });
+    }
+
+    // 7. Composite Natural Hazards (Seismic / Flood / Forest Wildfire)
+    const hazIdx = getHazardIndex(w);
+    const seisPct = Math.round(getSeismicRisk(w) * 100);
+    const firePct = Math.round(getWildfireRisk(w) * 100);
+    if (hazIdx >= 58 || seisPct >= 70 || firePct >= 68) {
+      const domHazardAr =
+        seisPct >= firePct && seisPct >= Math.round(w.flood * 100)
+          ? `نشاط زلزالي (${seisPct}%)`
+          : firePct >= Math.round(w.flood * 100)
+          ? `حرائق غابات (${firePct}%)`
+          : `فيضانات أودية (${Math.round(w.flood * 100)}%)`;
+      const domHazardEn =
+        seisPct >= firePct && seisPct >= Math.round(w.flood * 100)
+          ? `Seismic (${seisPct}%)`
+          : firePct >= Math.round(w.flood * 100)
+          ? `Wildfire (${firePct}%)`
+          : `Flood (${Math.round(w.flood * 100)}%)`;
+
+      alerts.push({
+        id: `ew-hazard-${w.num}`,
+        category: 'hazards',
+        severity: hazIdx >= 70 || seisPct >= 76 ? 'CRITICAL' : 'HIGH',
+        wilayaNum: w.num,
+        wilayaEn: w.en,
+        wilayaAr: w.n,
+        geoZone: geo.id,
+        geoZoneLabel: geo.label,
+        geoZoneLabelAr: geo.labelAr,
+        regionalAssetNote: geo.assetNote,
+        regionalAssetNoteAr: geo.assetNoteAr,
+        metric: lang === 'ar' ? `مخاطر طبيعية مركبة (${domHazardAr})` : `Multi-Hazard Exposure (${domHazardEn})`,
+        currentValue: `${hazIdx}/100`,
+        criticalThreshold: '58/100',
+        detectedAt: now,
+        calculationMethod: 'CRAAG Seismic × Flood DEM × Sentinel Wildfire Index',
+        uncertaintyMargin: '± 5.5%',
+        suggestedAction: `[Short] Pre-position DGPC civil protection brigades, clear forest firebreaks & inspect seismic shelter sites. [Medium] Enforce RPA99 seismic retrofitting on schools/hospitals and deploy thermal wildfire watchtowers. [Long] Establish satellite-linked multi-hazard early sirens & strict catastrophe zoning.`,
+        suggestedActionAr: `[قصير] تمركز مسبق لوحدات الحماية المدنية وفتح المسالك الغابية ومراقبة نقاط الإيواء. [متوسط] إخضاع المستشفيات والمدارس لمعايير التحديث المضاد للزلازل (RPA99) وأبراج رصد الحرائق. [طويل] نظام إنذار فضائي موحد للأخطار الكبرى وتأمين إلزامي ضد الكوارث.`,
+        protocols: {
+          shortTerm: `Pre-position Civil Protection (DGPC) columns, clear forest firebreaks & audit emergency seismic shelters (${domHazardEn}).`,
+          shortTermAr: `انتشار استباقي لوحدات الحماية المدنية، شق الخنادق المضادة للحرائق، وتدقيق مراكز الإيواء (${domHazardAr}).`,
+          mediumTerm: `Retrofit critical schools & hospitals to RPA-99/2003 seismic standards and deploy thermal IoT wildfire cameras.`,
+          mediumTermAr: `تدعيم المدارس والمستشفيات وفق المعايير المضادة للزلازل (RPA) ونشر كاميرات الرصد الحراري المبكر للحرائق.`,
+          longTerm: `Integrate automated seismic micro-zoning, flash-flood radar sirens & parametric disaster insurance coverage.`,
+          longTermAr: `دمج التخريط الزلزالي الدقيق وصفارات الرادار الاستباقية وتعميم التأمين التعاوني ضد الكوارث الطبيعية.`
+        }
+      });
+    }
+
+    // 8. Multimodal Transport & Logistics Bottleneck
+    const trScore = getTransportScore(w);
+    const hasRail = hasRailAccess(w);
+    if (trScore < 50 && !hasRail) {
+      alerts.push({
+        id: `ew-transport-${w.num}`,
+        category: 'transport',
+        severity: trScore < 38 ? 'HIGH' : 'MEDIUM',
+        wilayaNum: w.num,
+        wilayaEn: w.en,
+        wilayaAr: w.n,
+        geoZone: geo.id,
+        geoZoneLabel: geo.label,
+        geoZoneLabelAr: geo.labelAr,
+        regionalAssetNote: geo.assetNote,
+        regionalAssetNoteAr: geo.assetNoteAr,
+        metric: lang === 'ar' ? 'اختناق النقل والربط متعدد الوسائط' : 'Transport & Rail Connectivity Gap',
+        currentValue: `${trScore}/100`,
+        criticalThreshold: '50/100',
+        detectedAt: now,
+        calculationMethod: 'Multimodal Graph Centrality (Road Index + SNTF Rail + Hub Access)',
+        uncertaintyMargin: '± 4.8%',
+        suggestedAction: `[Short] Rehabilitate RN trunk bottle-necks and subsidize regional freight shuttles (Roads ${w.roads}/100). [Medium] Build dry-port intermodal relay & upgrade provincial road feeders. [Long] Extend SNTF rail spur & multimodal desert/steppe logistics platform.`,
+        suggestedActionAr: `[قصير] صيانة المقاطع المتضررة من الطرق الوطنية وتدعيم خطوط النقل اللوجستي الجهوية (الطرق ${w.roads}/100). [متوسط] إنشاء ميناء جاف ومحطة نقل متعددة الوسائط. [طويل] تمديد خط السكة الحديدية (SNTF) وربط الولاية بالممرات اللوجستية القارية.`,
+        protocols: {
+          shortTerm: `Repair critical National Road (RN) bottle-necks and expand regional passenger & cold-freight shuttles (Roads ${w.roads}/100).`,
+          shortTermAr: `تهيئة النقاط السوداء بالطرق الوطنية وتكثيف رحلات النقل العمومي وشحن البضائع المبردة (مؤشر الطرق ${w.roads}/100).`,
+          mediumTerm: `Establish an intermodal dry-port logistics platform and reinforce rural arterial connections.`,
+          mediumTermAr: `إنجاز محطة لوجستية وميناء جاف لتحويل البضائع مع ازدواجية المحاور الولائية الرئيسية.`,
+          longTerm: `Connect the wilaya to the SNTF railway expansion network and electrified high-capacity freight corridors.`,
+          longTermAr: `ربط الولاية بشبكة السكك الحديدية الوطنية (SNTF) والمحاور اللوجستية عالية السرعة.`
+        }
       });
     }
   });
