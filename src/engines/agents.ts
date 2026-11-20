@@ -7,6 +7,7 @@
 import { AgentAnalysisOutput, AgentProfile, WilayaRecord } from '../types';
 import { computeMoransI, computeGetisOrdGi, computeGravityInteraction, haversineDistance } from './gis';
 import { executeForecastModel } from './quantitative';
+import { classifyWilayaGeoZone } from './earlyWarning';
 import {
   getHospitalsCount,
   getHealthCoverage,
@@ -115,11 +116,24 @@ export const AI_AGENT_PROFILES: AgentProfile[] = [
 ];
 
 function inferEcoZone(w: WilayaRecord, lang: 'ar' | 'en'): { key: 'sahara' | 'steppe' | 'tell'; label: string } {
-  const isSahara = w.region === 'Sahara' || w.lat < 33 || w.rain < 140;
-  const isSteppe = !isSahara && (w.region === 'High-Plateaus' || w.rain < 420);
-  if (isSahara) return { key: 'sahara', label: lang === 'ar' ? 'الإقليم الصحراوي القاحل' : 'Saharan Arid Belt' };
-  if (isSteppe) return { key: 'steppe', label: lang === 'ar' ? 'إقليم الهضاب العليا والسهوب' : 'High-Plateaus Steppe' };
-  return { key: 'tell', label: lang === 'ar' ? 'الإقليم التلي الساحلي والجبلي' : 'Tell & Coastal Belt' };
+  const geo = classifyWilayaGeoZone(w);
+  const sub = lang === 'ar' ? geo.subRegionLabelAr : geo.subRegionLabel;
+  if (geo.id === 'deep_sahara' || geo.id === 'oasis_north') {
+    return {
+      key: 'sahara',
+      label: lang === 'ar' ? `${sub} · الإقليم الصحراوي` : `${sub} · Saharan Region`
+    };
+  }
+  if (geo.id === 'high_plateaus') {
+    return {
+      key: 'steppe',
+      label: lang === 'ar' ? `${sub} · الهضاب العليا والأطلس الصحراوي` : `${sub} · High-Plateaus & Saharan Atlas`
+    };
+  }
+  return {
+    key: 'tell',
+    label: lang === 'ar' ? `${sub} · الإقليم التلي الشمالي` : `${sub} · Northern Tell Region`
+  };
 }
 
 function getRank(allWilayas: WilayaRecord[], w: WilayaRecord, selector: (x: WilayaRecord) => number, descending = true): number {

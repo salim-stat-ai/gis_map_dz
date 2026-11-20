@@ -418,7 +418,7 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
           <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; border-bottom:1px solid rgba(255,255,255,0.12); padding-bottom:6px; margin-bottom:6px;">
             <div>
               <b style="font-size: 14px; color: #38BDF8;">${w.num}. ${isAr ? w.n : w.en}</b>
-              <div style="font-size: 10px; color: #94A3B8;">${isAr ? w.en : w.n} · ${isAr ? geo.labelAr : geo.label}</div>
+              <div style="font-size: 10px; color: #94A3B8;">${isAr ? w.en : w.n} · ${isAr ? geo.subRegionLabelAr : geo.subRegionLabel}</div>
             </div>
             <span style="font-size:10px; font-weight:700; padding:2px 6px; border-radius:6px; background:rgba(255,255,255,0.08); color:${c}; white-space:nowrap;">${rLab}</span>
           </div>
@@ -1102,20 +1102,28 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
       {/* Right Aside: Wilaya Detail Panel & Action Center */}
       <aside className="order-3 lg:col-span-3 space-y-4">
         <div className="bg-[#0D172E] border border-white/10 rounded-xl p-4 shadow-lg space-y-3">
-          <div className="border-b border-white/10 pb-2">
-            <div className="flex items-center justify-between">
-              <h2 className="font-extrabold text-base text-white flex items-center gap-1.5">
-                <MapPin className="w-4 h-4 text-rose-500" />
-                <span>{selectedWilaya.num}. {isAr ? selectedWilaya.n : selectedWilaya.en}</span>
-              </h2>
-              <span className="text-xs bg-sky-500/20 text-sky-400 px-2 py-0.5 rounded font-bold">
-                {selectedWilaya.region || 'Algeria'}
-              </span>
-            </div>
-            <div className="text-[11px] text-slate-400 mt-1">
-              {isAr ? `${selectedWilaya.en} — خط العرض: ${selectedWilaya.lat}°، خط الطول: ${selectedWilaya.lon}°` : `${selectedWilaya.n} — Lat: ${selectedWilaya.lat}°, Lon: ${selectedWilaya.lon}°`}
-            </div>
-          </div>
+          {(() => {
+            const selectedGeo = classifyWilayaGeoZone(selectedWilaya);
+            return (
+              <div className="border-b border-white/10 pb-2">
+                <div className="flex items-start justify-between gap-2">
+                  <h2 className="font-extrabold text-base text-white flex items-center gap-1.5 shrink-0">
+                    <MapPin className="w-4 h-4 text-rose-500" />
+                    <span>{selectedWilaya.num}. {isAr ? selectedWilaya.n : selectedWilaya.en}</span>
+                  </h2>
+                  <span
+                    className="text-[10px] bg-sky-500/20 text-sky-300 border border-sky-500/30 px-2 py-0.5 rounded font-bold text-end leading-tight"
+                    title={isAr ? selectedGeo.labelAr : selectedGeo.label}
+                  >
+                    {isAr ? selectedGeo.subRegionLabelAr : selectedGeo.subRegionLabel}
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-400 mt-1">
+                  {isAr ? `${selectedWilaya.en} — خط العرض: ${selectedWilaya.lat}°، خط الطول: ${selectedWilaya.lon}°` : `${selectedWilaya.n} — Lat: ${selectedWilaya.lat}°, Lon: ${selectedWilaya.lon}°`}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Quick Metrics */}
           <div className="text-xs space-y-1 text-slate-300 bg-[#121F3D] p-2.5 rounded-lg border border-white/5">
@@ -1479,6 +1487,9 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
                     {dw.num}. {isAr ? `${dw.n} (${dw.en})` : `${dw.en} (${dw.n})`}
                   </h2>
                   <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                    {isAr ? dwGeo.subRegionLabelAr : dwGeo.subRegionLabel}
+                  </span>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-white/5 text-slate-300 border border-white/10">
                     {isAr ? dwGeo.labelAr : dwGeo.label}
                   </span>
                   <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-md ${

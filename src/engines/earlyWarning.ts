@@ -4,7 +4,7 @@
  * © 2026 Salim Slimani & National Foresight System
  */
 
-import { EarlyWarningAlert, GeoZoneId, ProtocolHorizons, WilayaRecord } from '../types';
+import { EarlyWarningAlert, GeoZoneId, ProtocolHorizons, SubRegionId, WilayaRecord } from '../types';
 import {
   getHazardIndex,
   getHealthCoverage,
@@ -21,13 +21,92 @@ import {
 const COASTAL_WILAYAS = new Set([2, 6, 13, 15, 16, 18, 21, 23, 27, 31, 35, 36, 42, 46]);
 const TELL_BASIN_WILAYAS = new Set([9, 10, 22, 24, 25, 26, 29, 41, 43, 44, 48]);
 const HIGH_PLATEAUS_WILAYAS = new Set([3, 4, 5, 12, 14, 17, 19, 20, 28, 32, 34, 38, 40, 45]);
-const OASIS_NORTH_WILAYAS = new Set([7, 30, 39, 47, 51, 55, 57, 58]);
-const DEEP_SAHARA_WILAYAS = new Set([1, 8, 11, 33, 37, 49, 50, 52, 53, 54, 56]);
+// Northern / Western Saharan Oases & Corridors: Saoura (8, 52), Ziban (7, 51), Oued Righ (30, 55, 57), Souf (39), M'Zab (47, 58)
+const OASIS_NORTH_WILAYAS = new Set([7, 8, 30, 39, 47, 51, 52, 55, 57, 58]);
+// Deep Sahara: Touat (1), Ahaggar & Tanezrouft/Tiniri (11, 50, 54), Tassili n'Ajjer (33, 56), Hammada/Erg Iguidi-Chech (37), Gourara (49), Tidikelt (53)
+const DEEP_SAHARA_WILAYAS = new Set([1, 11, 33, 37, 49, 50, 53, 54, 56]);
+
+export interface SubRegionMeta {
+  id: SubRegionId;
+  label: string;
+  labelAr: string;
+  detail: string;
+  detailAr: string;
+}
+
+export const ALGERIA_SUBREGION_MAP: Record<number, SubRegionMeta> = {
+  // 1. الإقليم الصحراوي (Sahara Natural Regions)
+  8:  { id: 'saoura', label: "Saoura Basin (Béchar, Kenadsa & Taghit)", labelAr: 'الساورة (بشار، القنادسة، تاغيت)', detail: 'Oued Saoura valley between Grand Erg Occidental & Hammada', detailAr: 'وادي الساورة بين العرق الغربي الكبير شرقاً وهضاب الحمادة غرباً' },
+  52: { id: 'saoura', label: 'Saoura Oasis Corridor (Béni Abbès)', labelAr: 'الساورة (بني عباس وواحات الوادي)', detail: 'Lower Oued Saoura ksour & palm corridor', detailAr: 'امتداد وادي الساورة وقصور الواحات بمحاذاة العرق الغربي الكبير' },
+  37: { id: 'hammada_erg', label: 'Hammada du Drâa, Erg Iguidi & Chech', labelAr: 'الحمادة وعرق إيقدي والشاش (تندوف)', detail: 'Rocky Hammada du Drâa bordered by Ergs Iguidi & Chech', detailAr: 'هضاب حمادة الدراع الصخرية الفاصلة لعرق إيقدي والشاش' },
+  49: { id: 'gourara', label: 'Gourara Red Oases (Timimoun)', labelAr: 'قورارة (تيميمون والسبخة وتادمايت)', detail: 'Red oasis belt around Timimoun Sebkha & Tademaït plateau edge', detailAr: 'الواحات الحمراء المحيطة بسبخة تيميمون وحافة هضبة تادمايت' },
+  1:  { id: 'touat', label: 'Touat Oasis Belt (Adrar & Reggane)', labelAr: 'توات (أدرار، رقان، زاوية كنتة)', detail: 'Elongated Foggara oases along Oued Messaoud & Grand Erg Occidental', detailAr: 'شريط واحات الفقارات بمحاذاة وادي مسعود والعرق الغربي الكبير' },
+  53: { id: 'tidikelt', label: 'Tidikelt Depression (In Salah & Aoulef)', labelAr: 'تيديكلت (عين صالح، أولف، إن غار)', detail: 'Southern Tademaït hinge connecting Central Sahara to Ahaggar', detailAr: 'جنوب هضبة تادمايت وحلقة الوصل بين الصحراء الوسطى والهقار' },
+  47: { id: 'mzab', label: "Chebka & M'Zab Valley (Ghardaïa)", labelAr: 'الشبكة / وادي مزاب (غرداية وقصورها)', detail: 'Dissected limestone Chebka plateau & seven M’Zab ksour', detailAr: 'الهضبة الكلسية الشبكية لوادي مزاب والقصور السبعة' },
+  58: { id: 'mzab', label: "Southern M'Zab – Tademaït (El Meniaa)", labelAr: 'الشبكة / مزاب الجنوبي وتادمايت (المنيعة)', detail: 'M’Zab–Tademaït Albian oasis gateway', detailAr: 'امتداد الشبكة والواحات الحوضية نحو هضبة تادمايت' },
+  7:  { id: 'ziban', label: 'Ziban Foothills (Biskra & Tolga)', labelAr: 'الزيبان (بسكرة وطولقة)', detail: 'Piedmont palm oases at the foot of the Saharan Atlas', detailAr: 'واحات الزيبان عند سفوح الأطلس الصحراوي' },
+  51: { id: 'ziban', label: 'Western Ziban (Ouled Djellal)', labelAr: 'الزيبان الغربي (أولاد جلال)', detail: 'Saharan Atlas piedmont & Oued Djedi pastoral oases', detailAr: 'امتداد واحات الزيبان وسفوح الأطلس الصحراوي' },
+  55: { id: 'oued_righ', label: 'Oued Righ Depression (Touggourt)', labelAr: 'وادي ريغ (تقرت وواحات النخيل)', detail: 'Artesian palm-oasis trough stretching south of Biskra', detailAr: 'منخفض وادي ريغ الغني بواحات النخيل والآبار الارتوازية' },
+  57: { id: 'oued_righ', label: "Upper Oued Righ (El M'Ghair & Chott Melrhir)", labelAr: 'وادي ريغ الشمالي (المغير)', detail: 'Northern Oued Righ oasis & Chott Melrhir depression', detailAr: 'المنخفض الواحي لوادي ريغ ومحيط شط ملغيغ' },
+  30: { id: 'oued_righ', label: 'Oued Mya & Southern Oued Righ (Ouargla)', labelAr: 'وادي ريغ وحوض مية (ورقلة)', detail: 'Artesian Complexe Terminal & Albian basin', detailAr: 'الامتداد الجنوبي لوادي ريغ وحوض وادي مية الألبي' },
+  39: { id: 'souf', label: 'Souf / Oued Souf (Grand Erg Oriental)', labelAr: 'سوف / وادي سوف (العرق الشرقي الكبير)', detail: 'Dune oases famous for sunken Ghout palm cultivation', detailAr: 'العرق الشرقي الكبير ونظام الغوط لزراعة النخيل' },
+  33: { id: 'tassili', label: "Tassili n'Ajjer Plateau (Illizi)", labelAr: 'الطاسيلي ناجر (إليزي)', detail: 'Sandstone canyon plateau & prehistoric rock-art sanctuary', detailAr: 'هضبة الطاسيلي الصخرية الشاسعة ومحمية النقوش الصخرية' },
+  56: { id: 'tassili', label: "Tassili n'Ajjer Core (Djanet)", labelAr: 'الطاسيلي ناجر (جانت)', detail: 'UNESCO sandstone formations & prehistoric cultural core', detailAr: 'قلب هضبة الطاسيلي ناجر وتكويناتها والرسوم الصخرية' },
+  11: { id: 'ahaggar', label: 'Ahaggar Volcanic Massif (Tamanrasset)', labelAr: 'الهقار (تمنراست والكتلة البركانية)', detail: 'High Saharan volcanic massif flanked by Tanezrouft & Tiniri regs', detailAr: 'الكتلة الجبلية البركانية للهقار بين سهول تانزروفت وتينيري' },
+  50: { id: 'ahaggar', label: 'Tanezrouft & Western Ahaggar (Bordj Badji Mokhtar)', labelAr: 'تانزروفت وغرب الهقار (برج باجي مختار)', detail: 'Vast gravel reg of Tanezrouft west of the Ahaggar massif', detailAr: 'سهول حصى تانزروفت الشاسعة غرب كتلة الهقار' },
+  54: { id: 'ahaggar', label: 'Tiniri & Southern Ahaggar (In Guezzam)', labelAr: 'تينيري وجنوب الهقار (عين قزام)', detail: 'Southern Ahaggar plains bordering Tiniri', detailAr: 'سهول الهقار الجنوبية المحيطة بتينيري' },
+
+  // 2. الهضاب العليا والأطلس الصحراوي (High Plateaus & Saharan Atlas)
+  28: { id: 'hodna', label: "Hodna Closed Basin (M'Sila & Bou Saâda)", labelAr: 'الحضنة (المسيلة وبوسعادة وشط الحضنة)', detail: 'Central endorheic Hodna basin & Chott El Hodna', detailAr: 'حوض الحضنة المغلق وسط الجزائر وشط الحضنة' },
+  34: { id: 'hodna', label: 'Northern Hodna & Bibans (Bordj Bou Arreridj)', labelAr: 'الحضنة والبيبان (برج بوعريريج)', detail: 'High plains transition between Hodna basin & Bibans range', detailAr: 'السهول العليا الشمالية لحوض الحضنة وسلسلة البيبان' },
+  5:  { id: 'aures', label: 'Aurès Massif (Batna)', labelAr: 'الأوراس (باتنة والكتلة الأوراسية)', detail: 'Rugged eastern Aurès mountain massif & highland valleys', detailAr: 'الكتلة الجبلية الوعرة للأوراس في الشرق الجزائري' },
+  40: { id: 'aures', label: 'Eastern Aurès & Nemencha Margin (Khenchela)', labelAr: 'الأوراس الشرقي والنمامشة (خنشلة)', detail: 'Eastern Aurès cedar highlands bordering Nemencha', detailAr: 'مرتفعات الأوراس الشرقية وامتدادها نحو النمامشة' },
+  4:  { id: 'aures', label: 'Aurès Piedmont & Chotts (Oum El Bouaghi)', labelAr: 'الأوراس والسباخ العليا (أم البواقي)', detail: 'Northeastern high plains bordering the Aurès massif', detailAr: 'السهوب العليا الشرقية المتاخمة لكتلة الأوراس' },
+  12: { id: 'nemencha', label: 'Nemencha Highlands (Tébessa)', labelAr: 'النمامشة (تبسة)', detail: 'Steppic mountain extension east of the Aurès massif', detailAr: 'الامتداد الجبلي والهضبي للنمامشة شرق الأوراس' },
+  17: { id: 'atlas_ksour', label: 'Ouled Naïl Mountains (Djelfa · Saharan Atlas)', labelAr: 'جبال أولاد نايل (الجلفة · الأطلس الصحراوي)', detail: 'Central Saharan Atlas ridge & Green Dam corridor', detailAr: 'سلسلة جبال أولاد نايل على طول الأطلس الصحراوي' },
+  3:  { id: 'atlas_ksour', label: 'Amour Mountains (Laghouat · Saharan Atlas)', labelAr: 'جبال عمور (الأغواط · الأطلس الصحراوي)', detail: 'Djebel Amour massif along the Saharan Atlas', detailAr: 'جبال عمور بالأطلس الصحراوي' },
+  32: { id: 'atlas_ksour', label: 'Amour–Ksour Steppe (El Bayadh)', labelAr: 'جبال عمور والقصور (البيض)', detail: 'Western Saharan Atlas ridges & high pastoral steppe', detailAr: 'امتداد جبال عمور والقصور بالأطلس الصحراوي' },
+  45: { id: 'atlas_ksour', label: 'Ksour Mountains (Naâma & Aïn Sefra)', labelAr: 'جبال القصور (النعامة وعين الصفراء)', detail: 'Westernmost Saharan Atlas Ksour range & Chott El Gharbi', detailAr: 'جبال القصور في أقصى غرب الأطلس الصحراوي' },
+  14: { id: 'sersou', label: 'Sersou Agricultural Plateau (Tiaret)', labelAr: 'السرسو (تيارت · الهضبة الزراعية الخصبة)', detail: 'Fertile cereal plateau immediately south of the Tell Atlas', detailAr: 'هضبة السرسو الزراعية الخصبة جنوب الأطلس التلي' },
+  38: { id: 'sersou', label: 'Sersou & Southern Ouarsenis (Tissemsilt)', labelAr: 'السرسو والونشريس (تيسمسيلت)', detail: 'Hinge between fertile Sersou plateau & Ouarsenis massif', detailAr: 'حلقة الوصل بين هضبة السرسو وكتلة الونشريس' },
+  19: { id: 'high_plains_east', label: 'Sétif High Plains & Lesser Kabylia (Babors)', labelAr: 'سهول سطيف العليا وشمال القبائل الصغرى', detail: 'High cereal plains rising into Lesser Kabylia Babors range', detailAr: 'الهضاب العليا السطايفية وامتدادها نحو القبائل الصغرى' },
+  20: { id: 'high_plateaus_west', label: 'Western High-Plateaus (Saïda)', labelAr: 'الهضاب العليا الغربية (سعيدة)', detail: 'Western steppe highland shelf between Tell & Chott Chergui', detailAr: 'الهضاب العليا الغربية بين التل وشط الشرقي' },
+
+  // 3. الشمال / الإقليم التلي (Tell & Coastal Regions)
+  15: { id: 'kabylia', label: 'Greater Kabylia (Tizi Ouzou & Djurdjura)', labelAr: 'القبائل الكبرى (تيزي وزو وجرجرة)', detail: 'Djurdjura mountain & coastal heartland of Greater Kabylia', detailAr: 'قلب القبائل الكبرى وسلسلة جرجرة' },
+  35: { id: 'kabylia', label: 'Greater Kabylia Coast (Boumerdès)', labelAr: 'القبائل الكبرى الساحلية (بومرداس)', detail: 'Western corridor of Greater Kabylia & Zemmouri littoral', detailAr: 'الامتداد الساحلي الغربي للقبائل الكبرى' },
+  10: { id: 'kabylia', label: 'Kabylia / Djurdjura Piedmont (Bouira)', labelAr: 'القبائل الكبرى الجنوبية (البويرة)', detail: 'Southern flanks of Djurdjura & Sahel–Isser valley', detailAr: 'السفوح الجنوبية لجرجرة ضمن إقليم القبائل' },
+  6:  { id: 'kabylia', label: 'Lesser Kabylia (Béjaïa & Soummam)', labelAr: 'القبائل الصغرى (بجاية ووادي الصومام)', detail: 'Heartland of Lesser Kabylia, Soummam valley & Babors coast', detailAr: 'القبائل الصغرى وحوض الصومام وساحل البابور' },
+  18: { id: 'kabylia', label: 'Lesser Kabylia East (Jijel)', labelAr: 'القبائل الصغرى الشرقية (جيجل)', detail: 'Forested coastal Babors ridges of Eastern Lesser Kabylia', detailAr: 'الامتداد الساحلي الغابي للقبائل الصغرى' },
+  27: { id: 'dahra', label: 'Dahra Coastal Range (Mostaganem)', labelAr: 'الظهرة (مستغانم والساحل التلي)', detail: 'Western Dahra coastal ridge & Lower Cheliff estuary', detailAr: 'سلسلة الظهرة الساحلية ومصب الشلف' },
+  2:  { id: 'dahra', label: 'Dahra & Middle Cheliff (Chlef & Ténès)', labelAr: 'الظهرة ووادي الشلف (الشلف وتنس)', detail: 'Coastal Dahra mountains descending into the Cheliff plain', detailAr: 'سلسلة الظهرة الساحلية بين تنس ووادي الشلف' },
+  48: { id: 'dahra', label: 'Southern Dahra & Lower Mina (Relizane)', labelAr: 'الظهرة الجنوبية وسهل مينا (غليزان)', detail: 'Southern Dahra piedmont & Cheliff–Mina alluvial valley', detailAr: 'الامتداد الداخلي للظهرة وسهل غليزان' },
+  44: { id: 'ouarsenis', label: 'Ouarsenis Massif (Aïn Defla & Upper Cheliff)', labelAr: 'الونشريس والأطلس التلي (عين الدفلى)', detail: 'Massive Ouarsenis mountain complex overlooking Upper Cheliff', detailAr: 'كتلة الونشريس الضخمة وسهل الشلف الأعلى' },
+  13: { id: 'trara', label: 'Trara Coastal Mountains (Tlemcen & Ghazaouet)', labelAr: 'الطرارة (تلمسان، الغزوات، ندرومة)', detail: 'Far northwestern coastal Trara range & Tlemcen mountains', detailAr: 'جبال الطرارة الساحلية في أقصى الشمال الغربي' },
+  46: { id: 'trara', label: 'Eastern Trara Coast (Aïn Témouchent)', labelAr: 'الطرارة الشرقية والساحل (عين تموشنت)', detail: 'Coastal volcanic ridge extending Trara toward Oran', detailAr: 'الامتداد الساحلي لإقليم الطرارة نحو وهران' },
+  16: { id: 'mitidja', label: 'Mitidja & Algiers Sahel (Algiers)', labelAr: 'متيجة والساحل العاصمي (الجزائر العاصمة)', detail: 'Central Mitidja coastal basin & Bay of Algiers', detailAr: 'سهل متيجة الساحلي وحوض الجزائر العاصمة' },
+  9:  { id: 'mitidja', label: 'Mitidja & Blida Atlas (Blida)', labelAr: 'سهل متيجة والأطلس البليدي (البليدة)', detail: 'Southern heart of the fertile Mitidja plain', detailAr: 'قلب سهل متيجة الخصيب وسفوح الأطلس البليدي' },
+  42: { id: 'mitidja', label: 'Western Mitidja & Chenoua (Tipaza)', labelAr: 'متيجة الغربية والساحل (تيبازة)', detail: 'Western Mitidja littoral corridor & Sahel hills', detailAr: 'الواجهة الساحلية الغربية لسهل متيجة' },
+  23: { id: 'edough_annaba', label: 'Edough & Annaba Plain', labelAr: 'سهل عنابة والقالة / إقليم الإيدوغ (عنابة)', detail: 'Northeastern Edough massif & coastal Seybouse plain', detailAr: 'سهل عنابة الساحلي وكتلة الإيدوغ في أقصى الشمال الشرقي' },
+  36: { id: 'edough_annaba', label: 'El Kala Wetlands & Edough Plain (El Tarf)', labelAr: 'سهل عنابة والقالة / إقليم الإيدوغ (الطارف)', detail: 'Extreme northeast coastal wetlands & Biosphere lagoons', detailAr: 'سهل القالة والبحيرات الساحلية وإقليم الإيدوغ' },
+  21: { id: 'edough_annaba', label: 'West Edough & Skikda Littoral (Skikda)', labelAr: 'ساحل سكيكدة وغرب الإيدوغ', detail: 'Northeastern littoral linking Annaba–Edough & Collo', detailAr: 'الساحل الشمالي الشرقي المتصل بإقليم الإيدوغ وعنابة' },
+  31: { id: 'tell_oranie', label: 'Oranie Littoral (Oran)', labelAr: 'الساحل الوهراني والتل الغربي (وهران)', detail: 'Murdjadjo bay & western Mediterranean port basin', detailAr: 'الحوض الساحلي الوهراني بالتل الغربي' },
+  22: { id: 'tell_oranie', label: 'Western Tell / Mekerra Plain (Sidi Bel Abbès)', labelAr: 'التل الغربي وسهول تسالة (سيدي بلعباس)', detail: 'Inland Tessala ridges & Mekerra agricultural basin', detailAr: 'سهول تسالة ومكرة بالإقليم التلي الغربي' },
+  29: { id: 'tell_oranie', label: 'Ghriss Plain & Beni Chougrane (Mascara)', labelAr: 'سهل غريس وبني شقران (معسكر)', detail: 'Inland Tell valley framed by Beni Chougrane ridges', detailAr: 'سهل غريس وجبال بني شقران بالإقليم التلي الغربي' },
+  26: { id: 'tell_titteri', label: 'Titteri & Central Tell Atlas (Médéa)', labelAr: 'التيطري والأطلس التلي الأوسط (المدية)', detail: 'Central Tell highlands overlooking Mitidja & Chelif', detailAr: 'مرتفعات التيطري بالأطلس التلي الأوسط' },
+  25: { id: 'tell_constantine', label: 'Eastern Tell & Rhumel Basin (Constantine)', labelAr: 'التل الشرقي وحوض الرمال (قسنطينة)', detail: 'Eastern Tell calcareous plateaus & Rhumel gorge', detailAr: 'أحواض التل الشرقي وهضبة قسنطينة' },
+  43: { id: 'tell_constantine', label: 'Eastern Tell & Beni Haroun Basin (Mila)', labelAr: 'التل الشرقي وحوض بني هارون (ميلة)', detail: 'Eastern Tell watershed feeding Beni Haroun reservoir', detailAr: 'الأحواض التلية الشرقية ومحيط سد بني هارون' },
+  24: { id: 'tell_constantine', label: 'Seybouse Basin & Eastern Tell (Guelma)', labelAr: 'التل الشرقي وحوض سيبوس (قالمة)', detail: 'Fertile Seybouse valley & Tell thermal ridges', detailAr: 'وادي سيبوس ومرتفعات التل الشرقي' },
+  41: { id: 'tell_constantine', label: 'Medjerda Basin & Eastern Tell (Souk Ahras)', labelAr: 'التل الشرقي وحوض مجردة (سوق أهراس)', detail: 'Forested Medjerda watershed on the eastern Tell crest', detailAr: 'حوض مجردة الجبلي بأقصى التل الشرقي' }
+};
 
 export function classifyWilayaGeoZone(w: WilayaRecord): {
   id: GeoZoneId;
   label: string;
   labelAr: string;
+  subRegionId: SubRegionId;
+  subRegionLabel: string;
+  subRegionLabelAr: string;
   assetNote: string;
   assetNoteAr: string;
 } {
@@ -50,46 +129,73 @@ export function classifyWilayaGeoZone(w: WilayaRecord): {
     id = w.lat >= 36.6 ? 'coastal' : 'tell_basin';
   }
 
+  const sub: SubRegionMeta = ALGERIA_SUBREGION_MAP[w.num] || (
+    id === 'coastal'
+      ? { id: 'mitidja', label: 'Tell Littoral', labelAr: 'الساحل التلي', detail: 'Coastal strip', detailAr: 'واجهة بحرية تلية' }
+      : id === 'tell_basin'
+      ? { id: 'tell_constantine', label: 'Tell Inland Basin', labelAr: 'الأحواض التلية الداخلية', detail: 'Inland Tell valley', detailAr: 'حوض داخلي تلي' }
+      : id === 'high_plateaus'
+      ? { id: 'atlas_ksour', label: 'High-Plateaus & Steppe', labelAr: 'الهضاب العليا والسهوب', detail: 'High steppe plateau', detailAr: 'إقليم الهضاب العليا والسهوب' }
+      : id === 'oasis_north'
+      ? { id: 'ziban', label: 'Saharan Corridor Oases', labelAr: 'واحات الممرات الصحراوية', detail: 'Corridor oasis', detailAr: 'واحات وممرات صحراوية' }
+      : { id: 'ahaggar', label: 'Deep Sahara Plateau', labelAr: 'العمق الصحراوي', detail: 'Deep arid Sahara', detailAr: 'عمق صحراوي' }
+  );
+
   switch (id) {
     case 'coastal':
       return {
         id,
-        label: 'Mediterranean Coastal',
-        labelAr: 'ساحلية متوسطية',
-        assetNote: `Coastline access · ${w.dams} dam(s) · ${w.rain} mm/yr · Pop ${w.pop.toLocaleString()}k`,
-        assetNoteAr: `واجهة بحرية · ${w.dams} سد · أمطار ${w.rain} ملم/سنة · ${w.pop.toLocaleString()} ألف نسمة`
+        label: 'Northern Coastal Tell (Mitidja, Kabylia, Dahra, Trara, Edough)',
+        labelAr: 'الإقليم التلي الساحلي (متيجة، القبائل، الظهرة، الطرارة، الإيدوغ)',
+        subRegionId: sub.id,
+        subRegionLabel: sub.label,
+        subRegionLabelAr: sub.labelAr,
+        assetNote: `${sub.detail} · ${w.dams} dam(s) · ${w.rain} mm/yr · Pop ${w.pop.toLocaleString()}k`,
+        assetNoteAr: `${sub.detailAr} · ${w.dams} سد · أمطار ${w.rain} ملم/سنة · ${w.pop.toLocaleString()} ألف نسمة`
       };
     case 'tell_basin':
       return {
         id,
-        label: 'Tell Atlas & Dam Basin',
-        labelAr: 'الأطلس التلي وأحواض السدود',
-        assetNote: `Inland valley · ${w.dams} dam(s) · ${w.wells} wells · Soil ${w.soil}/100`,
-        assetNoteAr: `حوض داخلي · ${w.dams} سد · ${w.wells} بئر · تربة ${w.soil}/100`
+        label: 'Inland Tell Atlas & Plains (Ouarsenis, Titteri, Eastern & Western Tell)',
+        labelAr: 'الإقليم التلي الداخلي (الونشريس، التيطري، أحواض الغرب والشرق)',
+        subRegionId: sub.id,
+        subRegionLabel: sub.label,
+        subRegionLabelAr: sub.labelAr,
+        assetNote: `${sub.detail} · ${w.dams} dam(s) · ${w.wells} wells · Soil ${w.soil}/100`,
+        assetNoteAr: `${sub.detailAr} · ${w.dams} سد · ${w.wells} بئر · تربة ${w.soil}/100`
       };
     case 'high_plateaus':
       return {
         id,
-        label: 'High-Plateaus & Steppe',
-        labelAr: 'الهضاب العليا والسهوب',
-        assetNote: `Steppe (${w.rain} mm/yr) · ${w.dams} dam(s) · ${w.wells} boreholes · No sea coast`,
-        assetNoteAr: `منطقة سهبية (${w.rain} ملم) · ${w.dams} سد · ${w.wells} بئر · بعيدة عن البحر`
+        label: 'High-Plateaus & Saharan Atlas (Hodna, Aurès, Nemencha, Sersou, Ksour)',
+        labelAr: 'الهضاب العليا والأطلس الصحراوي (الحضنة، الأوراس، النمامشة، السرسو، القصور)',
+        subRegionId: sub.id,
+        subRegionLabel: sub.label,
+        subRegionLabelAr: sub.labelAr,
+        assetNote: `${sub.detail} · ${w.rain} mm/yr · ${w.dams} dam(s) · ${w.wells} boreholes`,
+        assetNoteAr: `${sub.detailAr} · ${w.rain} ملم/سنة · ${w.dams} سد · ${w.wells} بئر`
       };
     case 'oasis_north':
       return {
         id,
-        label: 'Northern Oasis & Brackish Basin',
-        labelAr: 'الواحات والحوض الجوفي الشمالي',
-        assetNote: `Arid (${w.rain} mm) · ${w.wells} wells · Brackish Complexe Terminal / Albian`,
-        assetNoteAr: `أحواض واحات (${w.rain} ملم) · ${w.wells} بئر · مياه جوفية مالحة/ألبية`
+        label: "Saharan Oases Corridor (Saoura, Ziban, M'Zab, Oued Righ & Souf)",
+        labelAr: 'الواحات والممرات الصحراوية (الساورة، الزيبان، مزاب، وادي ريغ، سوف)',
+        subRegionId: sub.id,
+        subRegionLabel: sub.label,
+        subRegionLabelAr: sub.labelAr,
+        assetNote: `${sub.detail} · ${w.rain} mm/yr · ${w.dams} dam(s) · ${w.wells} wells`,
+        assetNoteAr: `${sub.detailAr} · ${w.rain} ملم/سنة · ${w.dams} سد · ${w.wells} بئر`
       };
     case 'deep_sahara':
       return {
         id,
-        label: 'Deep Sahara & Albian / Hoggar',
-        labelAr: 'الصحراء الكبرى (الحوض الألبي والهقار)',
-        assetNote: `Hyper-arid (${w.rain} mm) · 800–1,800 km inland · Solar + Albian/Foggara basin`,
-        assetNoteAr: `صحراء قاحلة (${w.rain} ملم) · بعيدة عن الساحل · طاقة شمسية وحوض ألبي/فقارات`
+        label: "Deep Sahara (Touat, Gourara, Tidikelt, Hammada, Tassili n'Ajjer & Ahaggar)",
+        labelAr: 'الصحراء الكبرى والعمق (توات، قورارة، تيديكلت، الحمادة، الطاسيلي، الهقار)',
+        subRegionId: sub.id,
+        subRegionLabel: sub.label,
+        subRegionLabelAr: sub.labelAr,
+        assetNote: `${sub.detail} · ${w.rain} mm/yr · Albian / Foggara / Solar basin`,
+        assetNoteAr: `${sub.detailAr} · ${w.rain} ملم/سنة · طاقة شمسية وحوض ألبي/فقارات`
       };
   }
 }
@@ -151,7 +257,19 @@ function buildWaterProtocol(w: WilayaRecord, zone: GeoZoneId, projectedDeficit: 
     };
   }
 
+  const isSaouraWadi = [8, 52].includes(w.num); // Saoura: Béchar (Djorf Torba) & Béni Abbès
+
   if (zone === 'oasis_north') {
+    if (isSaouraWadi) {
+      return {
+        shortTerm: `Protect Oued Saoura alluvial recharge, regulate Djorf Torba reservoir releases (${w.dams} dam(s)), and meter ${w.wells} perimeter wells.`,
+        shortTermAr: `حماية التغذية السطحية لوادي الساورة وتأطير مخزون سد جرف التربة والمنشآت (${w.dams} سدود) مع ترشيد السحب من ${w.wells} بئراً.`,
+        mediumTerm: `Build check-dams across Taghit & Beni Abbes tributary wadis to trap convective runoff between the Grand Erg Occidental and Hammada, plus solar brackish RO.`,
+        mediumTermAr: `إنجاز حواجز مائية وتحت-سطحية في روافد الساورة وتاغيت لاحتجاز السيول بين العرق الغربي والحمادة مع تحلية المياه الجوفية شمسياً.`,
+        longTerm: `Integrate Oued Saoura watershed telemetry with Béchar–Tindouf corridor deep groundwater recharge and zero-evaporation oasis drip lines (deficit ${projectedDeficit}).`,
+        longTermAr: `إرساء حوكمة رقمية لحوض الساورة مع التغذية الاصطناعية للفرشة الجوفية وتعميم التقطير المغلق بواحات بشار وبني عباس (عجز ${projectedDeficit}).`
+      };
+    }
     return {
       shortTerm: isDrainageSurplusOasis
         ? `Stop uncontrolled artesian drilling (${w.wells} wells); redirect shallow drainage excess out of urban pockets and operate solar brackish RO units for potable supply.`
@@ -170,7 +288,7 @@ function buildWaterProtocol(w: WilayaRecord, zone: GeoZoneId, projectedDeficit: 
     };
   }
 
-  // deep_sahara (far from coastal desalination — Adrar, Tamanrasset, Tindouf, Bechar, Illizi, Djanet, Timimoun, In Salah, etc.)
+  // deep_sahara (Touat, Gourara, Tidikelt, Hammada/Erg Iguidi-Chech, Tassili n'Ajjer & Ahaggar)
   return {
     shortTerm: isFoggaraHeritage
       ? `Zero sea-desalination feasibility (~1,300+ km inland): deploy solar-PV brackish well demineralization skids and restore gravity Foggaras to eliminate pumping & evaporation loss.`
@@ -316,6 +434,9 @@ export function scanNationalEarlyWarnings(
         geoZone: geo.id,
         geoZoneLabel: geo.label,
         geoZoneLabelAr: geo.labelAr,
+        subRegionId: geo.subRegionId,
+        subRegionLabel: geo.subRegionLabel,
+        subRegionLabelAr: geo.subRegionLabelAr,
         regionalAssetNote: geo.assetNote,
         regionalAssetNoteAr: geo.assetNoteAr,
         metric: lang === 'ar' ? 'العجز المائي التراكمي' : 'Cumulative Water Deficit',
@@ -344,6 +465,9 @@ export function scanNationalEarlyWarnings(
         geoZone: geo.id,
         geoZoneLabel: geo.label,
         geoZoneLabelAr: geo.labelAr,
+        subRegionId: geo.subRegionId,
+        subRegionLabel: geo.subRegionLabel,
+        subRegionLabelAr: geo.subRegionLabelAr,
         regionalAssetNote: geo.assetNote,
         regionalAssetNoteAr: geo.assetNoteAr,
         metric: lang === 'ar' ? 'مؤشر إجهاد المحاصيل الفلاحية (SPEI)' : 'Agricultural Crop Drought Index (SPEI)',
@@ -372,6 +496,9 @@ export function scanNationalEarlyWarnings(
         geoZone: geo.id,
         geoZoneLabel: geo.label,
         geoZoneLabelAr: geo.labelAr,
+        subRegionId: geo.subRegionId,
+        subRegionLabel: geo.subRegionLabel,
+        subRegionLabelAr: geo.subRegionLabelAr,
         regionalAssetNote: geo.assetNote,
         regionalAssetNoteAr: geo.assetNoteAr,
         metric: lang === 'ar' ? 'نسبة التعرض لفيضانات الأودية' : 'Wadi Bed Inundation Risk',
@@ -400,6 +527,9 @@ export function scanNationalEarlyWarnings(
         geoZone: geo.id,
         geoZoneLabel: geo.label,
         geoZoneLabelAr: geo.labelAr,
+        subRegionId: geo.subRegionId,
+        subRegionLabel: geo.subRegionLabel,
+        subRegionLabelAr: geo.subRegionLabelAr,
         regionalAssetNote: geo.assetNote,
         regionalAssetNoteAr: geo.assetNoteAr,
         metric: lang === 'ar' ? 'فجوة التغطية والتموين التجاري' : 'Retail Distribution Gap',
@@ -427,6 +557,9 @@ export function scanNationalEarlyWarnings(
         geoZone: geo.id,
         geoZoneLabel: geo.label,
         geoZoneLabelAr: geo.labelAr,
+        subRegionId: geo.subRegionId,
+        subRegionLabel: geo.subRegionLabel,
+        subRegionLabelAr: geo.subRegionLabelAr,
         regionalAssetNote: geo.assetNote,
         regionalAssetNoteAr: geo.assetNoteAr,
         metric: lang === 'ar' ? 'مضاربة عقارية عالية بمناطق مهددة' : 'Real Estate Speculation in Flood Zone',
@@ -454,6 +587,9 @@ export function scanNationalEarlyWarnings(
         geoZone: geo.id,
         geoZoneLabel: geo.label,
         geoZoneLabelAr: geo.labelAr,
+        subRegionId: geo.subRegionId,
+        subRegionLabel: geo.subRegionLabel,
+        subRegionLabelAr: geo.subRegionLabelAr,
         regionalAssetNote: geo.assetNote,
         regionalAssetNoteAr: geo.assetNoteAr,
         metric: lang === 'ar' ? 'استنزاف مفرط للفرشة الجوفية والآبار' : 'Aquifer Over-Extraction Anomaly',
@@ -481,6 +617,9 @@ export function scanNationalEarlyWarnings(
         geoZone: geo.id,
         geoZoneLabel: geo.label,
         geoZoneLabelAr: geo.labelAr,
+        subRegionId: geo.subRegionId,
+        subRegionLabel: geo.subRegionLabel,
+        subRegionLabelAr: geo.subRegionLabelAr,
         regionalAssetNote: geo.assetNote,
         regionalAssetNoteAr: geo.assetNoteAr,
         metric: lang === 'ar' ? 'فجوة التغطية الصحية وقدرة المستشفيات' : 'Healthcare Access & Hospital Gap',
@@ -530,6 +669,9 @@ export function scanNationalEarlyWarnings(
         geoZone: geo.id,
         geoZoneLabel: geo.label,
         geoZoneLabelAr: geo.labelAr,
+        subRegionId: geo.subRegionId,
+        subRegionLabel: geo.subRegionLabel,
+        subRegionLabelAr: geo.subRegionLabelAr,
         regionalAssetNote: geo.assetNote,
         regionalAssetNoteAr: geo.assetNoteAr,
         metric: lang === 'ar' ? `مخاطر طبيعية مركبة (${domHazardAr})` : `Multi-Hazard Exposure (${domHazardEn})`,
@@ -565,6 +707,9 @@ export function scanNationalEarlyWarnings(
         geoZone: geo.id,
         geoZoneLabel: geo.label,
         geoZoneLabelAr: geo.labelAr,
+        subRegionId: geo.subRegionId,
+        subRegionLabel: geo.subRegionLabel,
+        subRegionLabelAr: geo.subRegionLabelAr,
         regionalAssetNote: geo.assetNote,
         regionalAssetNoteAr: geo.assetNoteAr,
         metric: lang === 'ar' ? 'اختناق النقل والربط متعدد الوسائط' : 'Transport & Rail Connectivity Gap',
@@ -607,8 +752,8 @@ export function scanNationalEarlyWarnings(
               shortTermAr: `نشر مخيمات بيئية شمسية وحماية ${heritageCnt} موقعاً تراثياً وقصوراً صحراوية وتأمين رحلات ربط جوي جهوي للسياح.`,
               mediumTerm: `Build classified Saharan eco-lodges using local vernacular earth architecture (expanding ${hotelsCnt} hotels) with closed-loop solar water desalination.`,
               mediumTermAr: `إنجاز نزل سياحية بيئية مصنفة بالطراز المعماري الصحراوي (توسيع ${hotelsCnt} فندقاً) مزودة بتحلية شمسية مغلقة.`,
-              longTerm: `Establish UNESCO desert cultural corridors (Tassili–Hoggar–M'Zab–Gourara) with zero-carbon e-shuttle loops & craft cooperative hubs.`,
-              longTermAr: `إرساء مسارات التراث العالمي الصحراوي (الطاسيلي–الهقار–مزاب–قورارة) بنقل كهربائي نظيف وأقطاب للصناعة التقليدية.`
+              longTerm: `Establish desert cultural heritage circuits linking Tassili n'Ajjer, Ahaggar, Gourara, Touat, Tidikelt, Saoura (Taghit/Béni Abbès) & M'Zab with low-carbon transit.`,
+              longTermAr: `إرساء مسارات التراث العالمي الصحراوي (الطاسيلي، الهقار، قورارة، توات، تيديكلت، الساورة ومزاب) بنقل نظيف وأقطاب للصناعة التقليدية.`
             }
           : {
               shortTerm: `Upgrade Roman/Numidian & thermal station signage across ${heritageCnt} sites and subsidize boutique hospitality upgrades (${hotelsCnt} units).`,
@@ -629,6 +774,9 @@ export function scanNationalEarlyWarnings(
         geoZone: geo.id,
         geoZoneLabel: geo.label,
         geoZoneLabelAr: geo.labelAr,
+        subRegionId: geo.subRegionId,
+        subRegionLabel: geo.subRegionLabel,
+        subRegionLabelAr: geo.subRegionLabelAr,
         regionalAssetNote: geo.assetNote,
         regionalAssetNoteAr: geo.assetNoteAr,
         metric: lang === 'ar' ? 'فجوة الإيواء وتثمين التراث السياحي' : 'Tourism Hospitality & Heritage Access Gap',

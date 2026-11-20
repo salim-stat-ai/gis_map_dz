@@ -237,6 +237,35 @@ export interface CouncilConsensusResult {
 
 export type GeoZoneId = 'coastal' | 'tell_basin' | 'high_plateaus' | 'oasis_north' | 'deep_sahara';
 
+export type SubRegionId =
+  | 'saoura'
+  | 'hammada_erg'
+  | 'gourara'
+  | 'touat'
+  | 'tidikelt'
+  | 'mzab'
+  | 'ziban'
+  | 'oued_righ'
+  | 'souf'
+  | 'tassili'
+  | 'ahaggar'
+  | 'hodna'
+  | 'aures'
+  | 'nemencha'
+  | 'atlas_ksour'
+  | 'sersou'
+  | 'high_plains_east'
+  | 'high_plateaus_west'
+  | 'kabylia'
+  | 'dahra'
+  | 'ouarsenis'
+  | 'trara'
+  | 'mitidja'
+  | 'edough_annaba'
+  | 'tell_oranie'
+  | 'tell_titteri'
+  | 'tell_constantine';
+
 export interface ProtocolHorizons {
   shortTerm: string;
   shortTermAr: string;
@@ -256,6 +285,9 @@ export interface EarlyWarningAlert {
   geoZone?: GeoZoneId;
   geoZoneLabel?: string;
   geoZoneLabelAr?: string;
+  subRegionId?: SubRegionId;
+  subRegionLabel?: string;
+  subRegionLabelAr?: string;
   regionalAssetNote?: string;
   regionalAssetNoteAr?: string;
   metric: string;

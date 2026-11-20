@@ -274,6 +274,13 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
 
   // Geo-Zone Summary Breakdown
   const geoZoneSummaries = useMemo(() => {
+    const shortLabels: Record<GeoZoneId, { en: string; ar: string }> = {
+      coastal: { en: 'Coastal Tell', ar: 'التلي الساحلي' },
+      tell_basin: { en: 'Inland Tell & Plains', ar: 'التلي الداخلي' },
+      high_plateaus: { en: 'High-Plateaus & Atlas', ar: 'الهضاب والأطلس الصحراوي' },
+      oasis_north: { en: 'Saoura, Ziban & Oases', ar: 'الواحات والساورة والزيبان' },
+      deep_sahara: { en: 'Deep Sahara & Ahaggar', ar: 'الصحراء الكبرى والهقار' }
+    };
     const order: GeoZoneId[] = ['coastal', 'tell_basin', 'high_plateaus', 'oasis_north', 'deep_sahara'];
     return order.map((zoneId) => {
       const group = enrichedWilayas.filter((w) => w.geo.id === zoneId);
@@ -281,6 +288,8 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
       const popSum = group.reduce((s, w) => s + w.pop, 0);
       return {
         id: zoneId,
+        shortLabel: shortLabels[zoneId].en,
+        shortLabelAr: shortLabels[zoneId].ar,
         label: group[0]?.geo.label || zoneId,
         labelAr: group[0]?.geo.labelAr || zoneId,
         count: group.length,
@@ -410,7 +419,7 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
     geoZoneChartInstance.current = new ChartJS(geoZoneChartRef.current, {
       type: 'bar',
       data: {
-        labels: geoZoneSummaries.map((g) => (isAr ? g.labelAr : g.label)),
+        labels: geoZoneSummaries.map((g) => (isAr ? g.shortLabelAr : g.shortLabel)),
         datasets: [
           {
             label: isAr ? 'التغطية التجارية (%)' : 'Retail Coverage (%)',
@@ -492,6 +501,8 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
           (w) =>
             w.n.includes(searchTerm.trim()) ||
             w.en.toLowerCase().includes(q) ||
+            w.geo.subRegionLabelAr.includes(searchTerm.trim()) ||
+            w.geo.subRegionLabel.toLowerCase().includes(q) ||
             String(w.num) === q
         )
       : zoneFiltered;
@@ -924,6 +935,7 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
           <button
             key={gz.id}
             type="button"
+            title={isAr ? gz.labelAr : gz.label}
             onClick={() => setSelectedGeoZone(gz.id)}
             className={`p-3 rounded-xl border text-start transition cursor-pointer ${
               selectedGeoZone === gz.id
@@ -931,7 +943,7 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
                 : 'bg-[#0D172E] border-white/10 text-slate-300 hover:border-white/25'
             }`}
           >
-            <div className="text-xs font-extrabold truncate">{isAr ? gz.labelAr : gz.label}</div>
+            <div className="text-xs font-extrabold truncate">{isAr ? gz.shortLabelAr : gz.shortLabel}</div>
             <div className="flex items-center justify-between text-[11px] font-mono mt-1">
               <span className="text-sky-400">{gz.count}W</span>
               <span className="text-slate-400">{gz.popPct}% {isAr ? 'سكان' : 'pop'}</span>
@@ -1255,8 +1267,8 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
                     <td className="py-2 px-2.5 font-bold text-white whitespace-nowrap">
                       {w.num}. {isAr ? w.n : w.en}
                     </td>
-                    <td className="py-2 px-2.5 text-[11px] text-slate-400 whitespace-nowrap">
-                      {isAr ? w.geo.labelAr : w.geo.label}
+                    <td className="py-2 px-2.5 text-[11px] text-slate-300 whitespace-nowrap" title={isAr ? w.geo.labelAr : w.geo.label}>
+                      {isAr ? w.geo.subRegionLabelAr : w.geo.subRegionLabel}
                     </td>
                     <td className="py-2 px-2.5 font-mono whitespace-nowrap">
                       <span className="text-rose-300">{w.baseWater}</span>

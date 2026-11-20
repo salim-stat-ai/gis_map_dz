@@ -5,7 +5,7 @@
  */
 
 import React, { useState } from 'react';
-import { GeoZoneId, WilayaRecord } from '../types';
+import { GeoZoneId, SubRegionId, WilayaRecord } from '../types';
 import { scanNationalEarlyWarnings } from '../engines/earlyWarning';
 import {
   AlertOctagon,
@@ -55,6 +55,7 @@ export const EarlyWarningDashboard: React.FC<EarlyWarningDashboardProps> = ({
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [geoFilter, setGeoFilter] = useState<string>('all');
+  const [subRegionFilter, setSubRegionFilter] = useState<string>('all');
   const [horizonView, setHorizonView] = useState<HorizonView>('all');
   const [onlySelectedWilaya, setOnlySelectedWilaya] = useState<boolean>(false);
 
@@ -65,6 +66,7 @@ export const EarlyWarningDashboard: React.FC<EarlyWarningDashboardProps> = ({
     if (categoryFilter !== 'all' && a.category !== categoryFilter) return false;
     if (severityFilter !== 'all' && a.severity !== severityFilter) return false;
     if (geoFilter !== 'all' && a.geoZone !== geoFilter) return false;
+    if (subRegionFilter !== 'all' && a.subRegionId !== (subRegionFilter as SubRegionId)) return false;
     return true;
   });
 
@@ -87,8 +89,8 @@ export const EarlyWarningDashboard: React.FC<EarlyWarningDashboardProps> = ({
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-2xl">
               {isAr
-                ? 'بروتوكولات عملية مكيّفة مع طبيعة كل إقليم (ساحلي، تلي، سهبي، واحاتي، صحراوي عميق) ومقسمة إلى مدى قصير ومتوسط وطويل الأجل.'
-                : 'Region-specific protocols tailored to coastal, Tell basin, steppe plateaus, northern oases, and deep Saharan infrastructure across short, medium, and long horizons.'}
+                ? 'بروتوكولات عملية مكيّفة مع التقسيم الجغرافي الدقيق لـ 22 منطقة طبيعية (الساورة، قورارة، توات، الزيبان، الأوراس، الحضنة، القبائل، متيجة...) ومقسمة إلى مدى قصير ومتوسط وطويل الأجل.'
+                : 'Region-specific protocols tailored across Algeria’s 22 natural regions (Saoura, Gourara, Touat, Ziban, Aurès, Hodna, Kabylia, Mitidja, etc.) across short, medium, and long horizons.'}
             </p>
           </div>
 
@@ -201,14 +203,55 @@ export const EarlyWarningDashboard: React.FC<EarlyWarningDashboardProps> = ({
             <select
               value={geoFilter}
               onChange={(e) => setGeoFilter(e.target.value)}
-              className="bg-[#121F3D] text-slate-200 border border-white/10 rounded-lg px-2.5 py-1 text-xs font-bold cursor-pointer"
+              className="bg-[#121F3D] text-slate-200 border border-white/10 rounded-lg px-2.5 py-1 text-xs font-bold cursor-pointer max-w-[230px]"
             >
-              <option value="all">{isAr ? 'كل الأقاليم الجغرافية' : 'All Geo-Zones'}</option>
-              <option value="coastal">{isAr ? 'ساحلية متوسطية' : 'Mediterranean Coastal'}</option>
-              <option value="tell_basin">{isAr ? 'الأطلس التلي والسدود' : 'Tell Atlas & Dam Basin'}</option>
-              <option value="high_plateaus">{isAr ? 'الهضاب العليا والسهوب' : 'High-Plateaus & Steppe'}</option>
-              <option value="oasis_north">{isAr ? 'الواحات والحوض الشمالي' : 'Northern Oasis Basin'}</option>
-              <option value="deep_sahara">{isAr ? 'الصحراء الكبرى والهقار' : 'Deep Sahara & Hoggar'}</option>
+              <option value="all">{isAr ? 'كل الأقاليم الكبرى (5)' : 'All Macro Geo-Zones (5)'}</option>
+              <option value="coastal">{isAr ? 'التلي الساحلي (متيجة، القبائل، الظهرة...)' : 'Coastal Tell (Mitidja, Kabylia, Dahra...)'}</option>
+              <option value="tell_basin">{isAr ? 'التلي الداخلي (الونشريس، التيطري، الشرق)' : 'Inland Tell (Ouarsenis, Titteri, E/W Tell)'}</option>
+              <option value="high_plateaus">{isAr ? 'الهضاب العليا والأطلس الصحراوي' : 'High-Plateaus & Saharan Atlas'}</option>
+              <option value="oasis_north">{isAr ? 'الواحات (الساورة، الزيبان، ريغ، سوف، مزاب)' : 'Corridor Oases (Saoura, Ziban, Souf, M’Zab)'}</option>
+              <option value="deep_sahara">{isAr ? 'الصحراء الكبرى (توات، قورارة، الهقار، الطاسيلي)' : 'Deep Sahara (Touat, Gourara, Ahaggar, Tassili)'}</option>
+            </select>
+
+            <select
+              value={subRegionFilter}
+              onChange={(e) => setSubRegionFilter(e.target.value)}
+              className="bg-[#121F3D] text-slate-200 border border-white/10 rounded-lg px-2.5 py-1 text-xs font-bold cursor-pointer max-w-[240px]"
+            >
+              <option value="all">{isAr ? 'كل المناطق الطبيعية (22 منطقة)' : 'All Natural Regions (22)'}</option>
+              <optgroup label={isAr ? 'أولاً: الإقليم الصحراوي' : '1. Saharan Region'}>
+                <option value="saoura">{isAr ? 'الساورة (بشار، القنادسة، تاغيت، بني عباس)' : 'Saoura (Béchar, Kenadsa, Taghit, Béni Abbès)'}</option>
+                <option value="hammada_erg">{isAr ? 'الحمادة وعرق إيقدي والشاش (تندوف)' : 'Hammada, Erg Iguidi & Chech (Tindouf)'}</option>
+                <option value="gourara">{isAr ? 'قورارة (تيميمون والسبخة)' : 'Gourara (Timimoun)'}</option>
+                <option value="touat">{isAr ? 'توات (أدرار، رقان، زاوية كنتة)' : 'Touat (Adrar & Reggane)'}</option>
+                <option value="tidikelt">{isAr ? 'تيديكلت (عين صالح، أولف، إن غار)' : 'Tidikelt (In Salah & Aoulef)'}</option>
+                <option value="mzab">{isAr ? 'الشبكة / وادي مزاب (غرداية والمنيعة)' : "Chebka / M'Zab (Ghardaïa & El Meniaa)"}</option>
+                <option value="ziban">{isAr ? 'الزيبان (بسكرة، طولقة، أولاد جلال)' : 'Ziban (Biskra & Ouled Djellal)'}</option>
+                <option value="oued_righ">{isAr ? 'وادي ريغ (تقرت، المغير، ورقلة)' : 'Oued Righ (Touggourt, El M’Ghair, Ouargla)'}</option>
+                <option value="souf">{isAr ? 'سوف / وادي سوف (الوادي)' : 'Souf / Oued Souf (El Oued)'}</option>
+                <option value="tassili">{isAr ? 'الطاسيلي ناجر (جانت وإليزي)' : "Tassili n'Ajjer (Djanet & Illizi)"}</option>
+                <option value="ahaggar">{isAr ? 'الهقار وتانزروفت وتينيري (تمنراست)' : 'Ahaggar, Tanezrouft & Tiniri'}</option>
+              </optgroup>
+              <optgroup label={isAr ? 'ثانياً: الهضاب العليا والأطلس الصحراوي' : '2. High-Plateaus & Saharan Atlas'}>
+                <option value="hodna">{isAr ? 'الحضنة (المسيلة وبوسعادة وبرج بوعريريج)' : "Hodna Basin (M'Sila & BBA)"}</option>
+                <option value="aures">{isAr ? 'الأوراس (باتنة، خنشلة، أم البواقي)' : 'Aurès Massif (Batna, Khenchela, OEB)'}</option>
+                <option value="nemencha">{isAr ? 'النمامشة (تبسة)' : 'Nemencha (Tébessa)'}</option>
+                <option value="atlas_ksour">{isAr ? 'جبال أولاد نايل وعمور والقصور' : 'Ouled Naïl, Amour & Ksour Mts'}</option>
+                <option value="sersou">{isAr ? 'السرسو (تيارت وتيسمسيلت)' : 'Sersou Plateau (Tiaret & Tissemsilt)'}</option>
+                <option value="high_plains_east">{isAr ? 'سهول سطيف العليا والقبائل الصغرى' : 'Sétif High Plains & Babors'}</option>
+                <option value="high_plateaus_west">{isAr ? 'الهضاب العليا الغربية (سعيدة)' : 'Western High-Plateaus (Saïda)'}</option>
+              </optgroup>
+              <optgroup label={isAr ? 'ثالثاً: مناطق الشمال (الإقليم التلي)' : '3. Northern Tell Region'}>
+                <option value="kabylia">{isAr ? 'القبائل الكبرى والصغرى' : 'Greater & Lesser Kabylia'}</option>
+                <option value="dahra">{isAr ? 'الظهرة (الشلف، مستغانم، غليزان)' : 'Dahra Range (Chlef, Mostaganem, Relizane)'}</option>
+                <option value="ouarsenis">{isAr ? 'الونشريس (عين الدفلى)' : 'Ouarsenis (Aïn Defla)'}</option>
+                <option value="trara">{isAr ? 'الطرارة (تلمسان وعين تموشنت)' : 'Trara Coast (Tlemcen & Aïn Témouchent)'}</option>
+                <option value="mitidja">{isAr ? 'متيجة (الجزائر، البليدة، تيبازة)' : 'Mitidja Plain (Algiers, Blida, Tipaza)'}</option>
+                <option value="edough_annaba">{isAr ? 'سهل عنابة والقالة / الإيدوغ' : 'Edough & Annaba–El Kala Plain'}</option>
+                <option value="tell_oranie">{isAr ? 'التل الغربي (وهران، سيدي بلعباس، معسكر)' : 'Western Tell & Oranie'}</option>
+                <option value="tell_titteri">{isAr ? 'التيطري والأطلس التلي الأوسط (المدية)' : 'Titteri & Central Tell (Médéa)'}</option>
+                <option value="tell_constantine">{isAr ? 'التل الشرقي (قسنطينة، ميلة، قالمة، سوق أهراس)' : 'Eastern Tell (Constantine, Mila, Guelma)'}</option>
+              </optgroup>
             </select>
 
             <select
@@ -297,12 +340,24 @@ export const EarlyWarningDashboard: React.FC<EarlyWarningDashboardProps> = ({
                         {alert.wilayaNum}. {isAr ? alert.wilayaAr : alert.wilayaEn}
                       </b>
                     </div>
-                    {alert.geoZoneLabel && (
+                    {(alert.subRegionLabel || alert.geoZoneLabel) && (
                       <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border ${geoClass}`}>
-                          <Compass className="w-2.5 h-2.5" />
-                          <span>{isAr ? alert.geoZoneLabelAr : alert.geoZoneLabel}</span>
+                        <span
+                          className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border ${geoClass}`}
+                          title={isAr ? alert.geoZoneLabelAr : alert.geoZoneLabel}
+                        >
+                          <Compass className="w-2.5 h-2.5 shrink-0" />
+                          <span>
+                            {isAr
+                              ? alert.subRegionLabelAr || alert.geoZoneLabelAr
+                              : alert.subRegionLabel || alert.geoZoneLabel}
+                          </span>
                         </span>
+                        {alert.subRegionLabel && alert.geoZoneLabel && (
+                          <span className="text-[10px] text-slate-400 bg-white/5 border border-white/10 px-1.5 py-0.5 rounded">
+                            {isAr ? alert.geoZoneLabelAr?.split('(')[0]?.trim() : alert.geoZoneLabel?.split('(')[0]?.trim()}
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>
