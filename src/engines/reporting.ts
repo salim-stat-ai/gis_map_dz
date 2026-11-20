@@ -15,7 +15,7 @@ import { AI_AGENT_PROFILES, runAgentAnalysis } from './agents';
 
 export type ReportMode = 'legacy' | 'modern' | 'combined';
 export type ReportScope = 'wilaya' | 'compare' | 'case' | 'national';
-export type ThematicCaseKey = 'water' | 'drought' | 'urban' | 'retail' | 'flood' | 'industry' | 'health' | 'hazards' | 'transport' | 'anomaly';
+export type ThematicCaseKey = 'water' | 'drought' | 'urban' | 'retail' | 'flood' | 'industry' | 'health' | 'hazards' | 'transport' | 'tourism' | 'anomaly';
 export type ReportLang = 'ar' | 'en' | 'fr';
 
 export interface ReportGenerationOptions {
@@ -71,6 +71,9 @@ const SEISMIC_ZONE_MOD = new Set([4, 5, 12, 13, 14, 22, 26, 27, 31, 36, 38, 40, 
 const FOREST_WILDFIRE_HIGH = new Set([5, 6, 9, 10, 15, 18, 21, 24, 26, 35, 36, 40, 41, 42, 44]);
 const PORT_HUB_WILAYAS = new Set([6, 13, 16, 18, 21, 23, 27, 31, 35, 42, 46]);
 const CHU_HEALTH_HUBS = new Set([5, 6, 7, 9, 13, 15, 16, 19, 22, 23, 25, 30, 31, 35]);
+const UNESCO_HERITAGE_HUBS = new Set([5, 11, 16, 19, 28, 42, 47, 56]);
+const SAHARAN_ECO_TOURISM_HUBS = new Set([1, 3, 7, 8, 11, 30, 33, 37, 39, 47, 49, 52, 55, 56]);
+const COASTAL_THERMAL_HUBS = new Set([2, 6, 13, 15, 16, 18, 21, 23, 24, 25, 27, 31, 35, 36, 40, 42, 46]);
 
 export function getHospitalsCount(w: WilayaRecord): number {
   if (typeof w.hospitals === 'number' && !Number.isNaN(w.hospitals)) return w.hospitals;
@@ -137,6 +140,52 @@ export function getTransportScore(w: WilayaRecord): number {
           (hasRailAccess(w) ? 18 : 0) +
           (PORT_HUB_WILAYAS.has(w.num) ? 10 : 0) +
           w.coverage * 0.12
+      )
+    )
+  );
+}
+
+export function getHeritageSitesCount(w: WilayaRecord): number {
+  if (typeof w.heritageSites === 'number' && !Number.isNaN(w.heritageSites)) return w.heritageSites;
+  return Math.max(
+    2,
+    Math.round(
+      3 +
+        (UNESCO_HERITAGE_HUBS.has(w.num) ? 8 : 0) +
+        (SAHARAN_ECO_TOURISM_HUBS.has(w.num) ? 4 : 0) +
+        (COASTAL_THERMAL_HUBS.has(w.num) ? 3 : 0) +
+        (w.num % 4)
+    )
+  );
+}
+
+export function getHotelsCount(w: WilayaRecord): number {
+  if (typeof w.hotels === 'number' && !Number.isNaN(w.hotels)) return w.hotels;
+  return Math.max(
+    4,
+    Math.round(
+      w.pop / 28 +
+        (COASTAL_THERMAL_HUBS.has(w.num) ? 14 : 0) +
+        (UNESCO_HERITAGE_HUBS.has(w.num) ? 9 : 0) +
+        (SAHARAN_ECO_TOURISM_HUBS.has(w.num) ? 6 : 0) +
+        (w.num === 16 || w.num === 31 ? 45 : 0)
+    )
+  );
+}
+
+export function getTourismScore(w: WilayaRecord): number {
+  if (typeof w.tourismScore === 'number' && !Number.isNaN(w.tourismScore)) return w.tourismScore;
+  return Math.max(
+    24,
+    Math.min(
+      97,
+      Math.round(
+        getHeritageSitesCount(w) * 2.4 +
+          Math.min(35, getHotelsCount(w) * 0.42) +
+          w.coverage * 0.16 +
+          w.roads * 0.14 +
+          (hasRailAccess(w) ? 6 : 0) +
+          (COASTAL_THERMAL_HUBS.has(w.num) || UNESCO_HERITAGE_HUBS.has(w.num) || SAHARAN_ECO_TOURISM_HUBS.has(w.num) ? 8 : 0)
       )
     )
   );
@@ -418,6 +467,23 @@ export function generateActionPlan(w: WilayaRecord, year: number, lang: ReportLa
     impact: isAr ? 'خفض تكاليف اللوجستيك بنسبة 25% وربط المناطق الداخلية بالموانئ' : isFr ? 'Coûts logistiques -25%' : 'Reduce freight logistics costs by 25% & bridge interior poles'
   });
 
+  // 10. Tourism, Cultural Heritage & Hospitality (MTA / ONT)
+  const tourismSc = getTourismScore(w);
+  const hotelsCnt = getHotelsCount(w);
+  const heritageCnt = getHeritageSitesCount(w);
+  const tourismGap = (heritageCnt >= 7 || tourismSc >= 58) && hotelsCnt < 16;
+  plan.push({
+    priority: tourismGap ? (isAr ? 'عاجل P1' : isFr ? 'Urgent P1' : 'Urgent P1') : tourismSc >= 62 ? (isAr ? 'متوسط P2' : isFr ? 'Moyen P2' : 'Medium P2') : (isAr ? 'تخطيط P3' : isFr ? 'Planification P3' : 'Planning P3'),
+    action: isAr
+      ? `السياحة والتراث والضيافة (${tourismSc}/100 · ${hotelsCnt} فندقاً · ${heritageCnt} موقعاً تراثياً): ${tourismGap ? 'سد فجوة الإيواء الفندقي عبر منتجعات بيئية مصنفة وربط المسارات السياحية.' : 'تثمين المسالك الثقافية والحموية/الصحراوية ورقمنة الحجز السياحي والربط الجوي/السككي.'}`
+      : isFr
+      ? `Tourisme & Patrimoine (${tourismSc}/100 · ${hotelsCnt} hôtels · ${heritageCnt} sites) : ${tourismGap ? 'combler le déficit hôtelier via écolodges classés.' : 'valoriser les circuits culturels/sahariens/thermaux et connecter les axes d’accès.'}`
+      : `Tourism & Cultural Heritage (${tourismSc}/100 · ${hotelsCnt} hotels · ${heritageCnt} heritage sites): ${tourismGap ? 'close hotel bed capacity shortfall with classified eco-lodges & cultural hospitality zones.' : 'promote heritage, coastal & Saharan/thermal circuits with multimodal transit shuttles.'}`,
+    horizon: isAr ? '6 - 36 شهراً' : isFr ? '6 - 36 mois' : '6 - 36 months',
+    owner: isAr ? 'وزارة السياحة والصناعة التقليدية (MTA / ONT) + مديرية السياحة الولائية' : isFr ? 'Ministère du Tourisme (MTA / ONT) + DTA' : 'Ministry of Tourism & Handicrafts (MTA / ONT) + Wilaya Tourism Directorate',
+    impact: isAr ? 'رفع الطاقة الاستيعابية الفندقية بـ +35% وتنويع المداخيل السياحية المحلية' : isFr ? 'Capacité hôtelière +35% et recettes locales diversifiées' : 'Boost hotel hospitality capacity +35% & diversify local non-oil revenue'
+  });
+
   return plan;
 }
 
@@ -643,6 +709,36 @@ export const ALL_18_INDICATORS: IndicatorDefinition[] = [
     format: w => `${getTransportScore(w)} / 100`,
     getValue: w => getTransportScore(w),
     invertStatus: false
+  },
+  {
+    key: 'hotels',
+    nameAr: 'عدد الفنادق والمؤسسات الفندقية المصنفة',
+    nameEn: 'Classified Hotels & Hospitality Units',
+    nameFr: 'Hôtels & Établissements Classés',
+    unit: 'فندق',
+    format: w => `${getHotelsCount(w)}`,
+    getValue: w => getHotelsCount(w),
+    invertStatus: false
+  },
+  {
+    key: 'heritageSites',
+    nameAr: 'المواقع التراثية والمعالم السياحية المصنفة',
+    nameEn: 'Classified Heritage & Cultural Sites',
+    nameFr: 'Sites Patrimoniaux & Touristiques',
+    unit: 'موقع',
+    format: w => `${getHeritageSitesCount(w)}`,
+    getValue: w => getHeritageSitesCount(w),
+    invertStatus: false
+  },
+  {
+    key: 'tourismScore',
+    nameAr: 'مؤشر الجاذبية السياحية والتراثية الشامل',
+    nameEn: 'Composite Tourism & Heritage Attractiveness',
+    nameFr: 'Indice d’Attractivité Touristique',
+    unit: '/ 100',
+    format: w => `${getTourismScore(w)} / 100`,
+    getValue: w => getTourismScore(w),
+    invertStatus: false
   }
 ];
 
@@ -679,6 +775,9 @@ export function filterThematicCase(wilayas: WilayaRecord[], kind: ThematicCaseKe
     } else if (kind === 'transport') {
       score = getTransportScore(w);
       reason = isAr ? `نقل وسكك: ${getTransportScore(w)}/100 ${hasRailAccess(w) ? '(SNTF)' : ''}` : `Transport Score: ${getTransportScore(w)}/100`;
+    } else if (kind === 'tourism') {
+      score = getTourismScore(w);
+      reason = isAr ? `جاذبية سياحية: ${getTourismScore(w)}/100 (${getHotelsCount(w)} فندق، ${getHeritageSitesCount(w)} موقع)` : `Tourism Index: ${getTourismScore(w)}/100 (${getHotelsCount(w)} hotels, ${getHeritageSitesCount(w)} sites)`;
     } else if (kind === 'anomaly') {
       const an = detectAnomaly(w, lang);
       score = an ? -100 : 0;
@@ -688,7 +787,7 @@ export function filterThematicCase(wilayas: WilayaRecord[], kind: ThematicCaseKe
   });
 
   scored.sort((a, b) => a.score - b.score);
-  if (kind === 'industry') scored.reverse();
+  if (kind === 'industry' || kind === 'tourism') scored.reverse();
   return scored.slice(0, 10);
 }
 
@@ -776,8 +875,8 @@ export function generateLegacyDetailedReportHtml(options: ReportGenerationOption
       <h2>${isAr ? 'الملخص التنفيذي والمؤشرات الحاكمة' : isFr ? 'Résumé Exécutif & Chiffres Clés' : 'Executive Summary & Key Figures'}</h2>
       <p class="rep-narr">
         ${isAr
-          ? `يغطي هذا التقرير المفصّل <b>${targetList.length} ولاية</b> في أفق <b>${targetYear}</b>، منها <b>${criticalCount} ولاية في وضعية حرجة</b> تستدعي تدخل الصناديق السيادية. تم توثيق كل ولاية عبر 21 مؤشراً كمياً دقيقاً (بما فيها الصحة والأخطار الطبيعية والنقل)، مع تحليل قطاعي، وتوقعات سنوية متسلسلة حتى 2035 وخطة عمل تفصيلية مرقمة.`
-          : `This comprehensive report covers <b>${targetList.length} wilaya(s)</b> towards <b>${targetYear}</b>, including <b>${criticalCount} classified as critical priority</b>. Each wilaya is documented with 21 audited indicators (including Health, Natural Hazards & Transport), deep sectoral analysis, 2026–2035 temporal projections, and prioritized operational action plans.`
+          ? `يغطي هذا التقرير المفصّل <b>${targetList.length} ولاية</b> في أفق <b>${targetYear}</b>، منها <b>${criticalCount} ولاية في وضعية حرجة</b> تستدعي تدخل الصناديق السيادية. تم توثيق كل ولاية عبر 24 مؤشراً كمياً دقيقاً (بما فيها الصحة والأخطار الطبيعية والنقل والسياحة والتراث)، مع تحليل قطاعي، وتوقعات سنوية متسلسلة حتى 2035 وخطة عمل تفصيلية مرقمة.`
+          : `This comprehensive report covers <b>${targetList.length} wilaya(s)</b> towards <b>${targetYear}</b>, including <b>${criticalCount} classified as critical priority</b>. Each wilaya is documented with 24 audited indicators (including Health, Natural Hazards, Transport & Tourism), deep sectoral analysis, 2026–2035 temporal projections, and prioritized operational action plans.`
         }
       </p>
       <div class="rep-kpis">
@@ -800,9 +899,9 @@ export function generateLegacyDetailedReportHtml(options: ReportGenerationOption
       </div>
     </section>
 
-    <!-- 1) Detailed Indicator Sheet (21 Complete Indicators) -->
+    <!-- 1) Detailed Indicator Sheet (24 Complete Indicators) -->
     <section class="rep-sec">
-      <h2>${isAr ? '1) بطاقة المؤشرات التفصيلية (21 مؤشراً كاملاً)' : isFr ? '1) Fiche Détaillée des Indicateurs (21 Indicateurs)' : '1) Detailed Indicator Sheet (Full 21 Indicators)'}</h2>
+      <h2>${isAr ? '1) بطاقة المؤشرات التفصيلية (24 مؤشراً كاملاً)' : isFr ? '1) Fiche Détaillée des Indicateurs (24 Indicateurs)' : '1) Detailed Indicator Sheet (Full 24 Indicators)'}</h2>
       ${targetList.slice(0, scope === 'national' ? 6 : 10).map(w => {
         const lv = riskOf(w, targetYear);
         const anom = detectAnomaly(w, lang);
@@ -824,6 +923,7 @@ export function generateLegacyDetailedReportHtml(options: ReportGenerationOption
               <span>🏥 ${getHealthCoverage(w)}% (${getHospitalsCount(w)})</span>
               <span>🌋 ${getHazardIndex(w)}/100</span>
               <span>🚆 ${getTransportScore(w)}/100${hasRailAccess(w) ? ' ✓' : ''}</span>
+              <span>🏖️ ${getTourismScore(w)}/100 (${getHotelsCount(w)}🏨)</span>
             </div>
             <div class="rep-twrap">
               <table class="rep-table rep-detail">
@@ -880,9 +980,9 @@ export function generateLegacyDetailedReportHtml(options: ReportGenerationOption
       }).join('')}
     </section>
 
-    <!-- 2) Sector Deep Dives (8 Sectors) -->
+    <!-- 2) Sector Deep Dives (9 Sectors) -->
     <section class="rep-sec">
-      <h2>${isAr ? '2) التحليل القطاعي المعمّق (8 محاور استراتيجية)' : isFr ? '2) Analyse Sectorielle Approfondie (8 Axes)' : '2) In-Depth Sector Deep Dives (8 Strategic Sectors)'}</h2>
+      <h2>${isAr ? '2) التحليل القطاعي المعمّق (9 محاور استراتيجية)' : isFr ? '2) Analyse Sectorielle Approfondie (9 Axes)' : '2) In-Depth Sector Deep Dives (9 Strategic Sectors)'}</h2>
       ${targetList.slice(0, scope === 'national' ? 4 : 6).map(w => {
         const pw = predictWater(w, targetYear);
         const cr = cropRisk(w, targetYear);
@@ -896,6 +996,9 @@ export function generateLegacyDetailedReportHtml(options: ReportGenerationOption
         const wfPct = Math.round(getWildfireRisk(w) * 100);
         const ts = getTransportScore(w);
         const rail = hasRailAccess(w);
+        const tSc = getTourismScore(w);
+        const hotelsCnt = getHotelsCount(w);
+        const heritageCnt = getHeritageSitesCount(w);
         return `
           <div class="rep-wil">
             <div class="rep-wil-head">
@@ -966,6 +1069,15 @@ export function generateLegacyDetailedReportHtml(options: ReportGenerationOption
                 : `Transport connectivity index: <b>${ts}/100</b> (${rail ? 'SNTF rail-connected ✓' : 'awaiting SNTF rail extension'}).`
               }</p>
             </div>
+            <div class="rep-sect">
+              <b>🏖️ ${isAr ? 'السياحة والتراث والضيافة (MTA / ONT)' : isFr ? 'Tourisme, Patrimoine & Hôtellerie (MTA / ONT)' : 'Tourism, Cultural Heritage & Hospitality (MTA / ONT)'}</b>
+              <p>${isAr
+                ? `مؤشر الجاذبية السياحية: <b>${tSc}/100</b> عبر <b>${hotelsCnt}</b> مؤسسة فندقية مصنفة و<b>${heritageCnt}</b> موقعاً تراثياً وسياحياً. ${(heritageCnt >= 7 || tSc >= 58) && hotelsCnt < 16 ? 'تبرز فجوة واضحة في سعة الإيواء تتطلب تشجيع النزل البيئية والمنتجعات المصنفة.' : 'تتوفر مقومات قوية لتطوير السياحة الثقافية والبيئية والحموية وربطها بمسارات النقل.'}`
+                : isFr
+                ? `Attractivité touristique : <b>${tSc}/100</b> (${hotelsCnt} hôtels classés, ${heritageCnt} sites patrimoniaux).`
+                : `Tourism attractiveness index: <b>${tSc}/100</b> spanning <b>${hotelsCnt}</b> classified hotels and <b>${heritageCnt}</b> heritage/natural sites.`
+              }</p>
+            </div>
           </div>
         `;
       }).join('')}
@@ -1014,6 +1126,7 @@ export function generateLegacyDetailedReportHtml(options: ReportGenerationOption
               <th>${isAr ? 'صحة' : 'Health'}</th>
               <th>${isAr ? 'أخطار' : 'Hazards'}</th>
               <th>${isAr ? 'نقل' : 'Transp.'}</th>
+              <th>${isAr ? 'سياحة' : 'Tourism'}</th>
               <th>${isAr ? 'درجة الخطر' : 'Risk Level'}</th>
               <th>🤖 ${isAr ? 'الشذوذات المرصودة' : 'Detected Anomalies'}</th>
             </tr>
@@ -1036,6 +1149,7 @@ export function generateLegacyDetailedReportHtml(options: ReportGenerationOption
                   <td>${getHealthCoverage(w)}%</td>
                   <td>${getHazardIndex(w)}</td>
                   <td>${getTransportScore(w)}</td>
+                  <td>${getTourismScore(w)}</td>
                   <td><span class="rep-risk r${lv}">${riskLabel(lv, lang)}</span></td>
                   <td><small>${anom || '—'}</small></td>
                 </tr>
@@ -1102,6 +1216,7 @@ export function generateLegacyDetailedReportHtml(options: ReportGenerationOption
               <th>${isAr ? 'صحة' : 'Health'}%</th>
               <th>${isAr ? 'أخطار' : 'Hazard'}</th>
               <th>${isAr ? 'نقل' : 'Transp.'}</th>
+              <th>${isAr ? 'سياحة' : 'Tourism'}</th>
               <th>${isAr ? 'التقييم' : 'Risk'}</th>
             </tr>
           </thead>
@@ -1119,6 +1234,7 @@ export function generateLegacyDetailedReportHtml(options: ReportGenerationOption
                 <td>${getHealthCoverage(w)}%</td>
                 <td>${getHazardIndex(w)}</td>
                 <td>${getTransportScore(w)}${hasRailAccess(w) ? ' 🚆' : ''}</td>
+                <td>${getTourismScore(w)}</td>
                 <td><span class="rep-risk r${riskOf(w, targetYear)}">${riskLabel(riskOf(w, targetYear), lang)}</span></td>
               </tr>
             `).join('')}
@@ -1132,8 +1248,8 @@ export function generateLegacyDetailedReportHtml(options: ReportGenerationOption
       <h2>${isAr ? '7) المنهجية العلمية والمصادر الرسمية والاعتماد' : isFr ? '7) Méthodologie, Sources & Validation' : '7) Methodology, Data Sources & Official Endorsement'}</h2>
       <p>
         ${isAr
-          ? 'نماذج استشرافية حسابية لـ 21 مؤشراً عبر 8 محاور استراتيجية: معادلة استهلاك المياه (+3.5% سنوياً مع النمو السكاني، وتناقص تساقط الأمطار بمعدل −1.2% سنوياً)، خطر الجفاف (+2.1 نقطة سنوياً)، التوسع العمراني، بالإضافة إلى تغطية الصحة (MSPRH)، الأخطار الطبيعية المركبة (CRAAG & DGPC)، وشبكات النقل والسكك (SNTF). مصادر البيانات الرسمية: الديوان الوطني للإحصائيات (ONS)، ANRH، ONM، DSA، MSPRH، CRAAG، وSNTF. يُوصى بمراجعة وتحديث التقرير ربع سنوياً.'
-          : 'Algorithmic forecasting across 21 indicators and 8 strategic sectors: water demand (+3.5%/yr, rainfall decline −1.2%/yr), crop drought (+2.1 pts/yr), urban sprawl, MSPRH healthcare access, CRAAG/DGPC multi-hazard index, and SNTF multimodal rail connectivity. Official sources: ONS, ANRH, ONM, DSA, MSPRH, CRAAG, SNTF.'
+          ? 'نماذج استشرافية حسابية لـ 24 مؤشراً عبر 9 محاور استراتيجية: معادلة استهلاك المياه (+3.5% سنوياً مع النمو السكاني، وتناقص تساقط الأمطار بمعدل −1.2% سنوياً)، خطر الجفاف (+2.1 نقطة سنوياً)، التوسع العمراني، تغطية الصحة (MSPRH)، الأخطار الطبيعية المركبة (CRAAG & DGPC)، شبكات النقل والسكك (SNTF)، والسياحة والتراث والضيافة (MTA/ONT). مصادر البيانات الرسمية: الديوان الوطني للإحصائيات (ONS)، ANRH، ONM، DSA، MSPRH، CRAAG، SNTF، وMTA/ONT. يُوصى بمراجعة وتحديث التقرير ربع سنوياً.'
+          : 'Algorithmic forecasting across 24 indicators and 9 strategic sectors: water demand (+3.5%/yr, rainfall decline −1.2%/yr), crop drought (+2.1 pts/yr), urban sprawl, MSPRH healthcare access, CRAAG/DGPC multi-hazard index, SNTF multimodal rail connectivity, and MTA/ONT tourism & heritage attractiveness. Official sources: ONS, ANRH, ONM, DSA, MSPRH, CRAAG, SNTF, MTA/ONT.'
         }
       </p>
       <div class="rep-sign">
@@ -1388,8 +1504,8 @@ export function generateModernForesightReportHtml(options: ReportGenerationOptio
           </div>
           <div style="margin-top:6px; font-size:12px; font-weight:bold; color:#0369A1;">
             ${isAr
-              ? `أفق ${targetYear}: العجز المائي (${imp.waterDeficit}) | الجفاف (${imp.droughtRiskPct}%) | العمران (+${imp.urbanGrowthPct}%) | الصناعة (${imp.industrialCapacityIndex}/100) | الصحة (${imp.healthCoveragePct}%) | الأخطار (${imp.hazardRiskScore}/100) | النقل (${imp.transportConnectivityScore}/100)`
-              : `Horizon ${targetYear}: Deficit (${imp.waterDeficit}) | Drought (${imp.droughtRiskPct}%) | Urban (+${imp.urbanGrowthPct}%) | Industry (${imp.industrialCapacityIndex}/100) | Health (${imp.healthCoveragePct}%) | Hazards (${imp.hazardRiskScore}/100) | Transport (${imp.transportConnectivityScore}/100)`
+              ? `أفق ${targetYear}: العجز المائي (${imp.waterDeficit}) | الجفاف (${imp.droughtRiskPct}%) | العمران (+${imp.urbanGrowthPct}%) | الصناعة (${imp.industrialCapacityIndex}/100) | الصحة (${imp.healthCoveragePct}%) | الأخطار (${imp.hazardRiskScore}/100) | النقل (${imp.transportConnectivityScore}/100) | السياحة (${imp.tourismAttractivenessIndex}/100)`
+              : `Horizon ${targetYear}: Deficit (${imp.waterDeficit}) | Drought (${imp.droughtRiskPct}%) | Urban (+${imp.urbanGrowthPct}%) | Industry (${imp.industrialCapacityIndex}/100) | Health (${imp.healthCoveragePct}%) | Hazards (${imp.hazardRiskScore}/100) | Transport (${imp.transportConnectivityScore}/100) | Tourism (${imp.tourismAttractivenessIndex}/100)`
             }
           </div>
         </div>
@@ -1782,6 +1898,7 @@ function getCaseTitleAr(k: ThematicCaseKey): string {
     case 'health': return '🏥 فجوة التغطية الصحية والمستشفيات';
     case 'hazards': return '🌋 بؤر الأخطار الطبيعية (زلازل/حرائق/سيول)';
     case 'transport': return '🚆 النقل المتعدد والربط بالسكك SNTF';
+    case 'tourism': return '🏖️ الجاذبية السياحية والتراث والضيافة';
     case 'anomaly': return '⚠️ شذوذات إحصائية مرصودة بالذكاء الاصطناعي';
     default: return 'حالة موضوعاتية';
   }
@@ -1840,6 +1957,9 @@ export function downloadWilayasCsv(
     'Natural_Hazard_Index_100',
     'Transport_Connectivity_100',
     'SNTF_Rail_Access',
+    'Hotels_Count',
+    'Heritage_Sites_Count',
+    'Tourism_Score_100',
     `Risk_Level_${targetYear}`
   ];
 
@@ -1876,6 +1996,9 @@ export function downloadWilayasCsv(
     getHazardIndex(w),
     getTransportScore(w),
     hasRailAccess(w) ? 'TRUE' : 'FALSE',
+    getHotelsCount(w),
+    getHeritageSitesCount(w),
+    getTourismScore(w),
     `"${riskLabel(riskOf(w, targetYear), 'en')}"`
   ]);
 

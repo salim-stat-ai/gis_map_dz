@@ -18,7 +18,10 @@ import {
   getHealthCoverage,
   getHazardIndex,
   getTransportScore,
-  hasRailAccess
+  hasRailAccess,
+  getHotelsCount,
+  getHeritageSitesCount,
+  getTourismScore
 } from '../engines/reporting';
 import {
   Compass,
@@ -37,7 +40,8 @@ import {
   Target,
   HeartPulse,
   ShieldAlert,
-  TrainFront
+  TrainFront,
+  Palmtree
 } from 'lucide-react';
 
 ChartJS.register(...registerables);
@@ -69,10 +73,10 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
   const [selectedGeoZone, setSelectedGeoZone] = useState<'all' | GeoZoneId>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [matrixSortBy, setMatrixSortBy] = useState<
-    'risk' | 'water' | 'agri' | 'industry' | 'coverage' | 'health' | 'hazards' | 'transport'
+    'risk' | 'water' | 'agri' | 'industry' | 'coverage' | 'health' | 'hazards' | 'transport' | 'tourism'
   >('risk');
 
-  // National 2030 Strategic Policy Levers (7 synchronized sector levers)
+  // National 2030 Strategic Policy Levers (8 synchronized sector levers)
   const [desalinationBoostM3, setDesalinationBoostM3] = useState<number>(450); // M m3/yr
   const [precisionIrrigationPct, setPrecisionIrrigationPct] = useState<number>(65); // %
   const [newWholesaleHubs, setNewWholesaleHubs] = useState<number>(40); // hubs nationally
@@ -80,6 +84,7 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
   const [healthExpansionPct, setHealthExpansionPct] = useState<number>(15); // % hospital/clinic expansion
   const [hazardMitigationStrictness, setHazardMitigationStrictness] = useState<number>(35); // % RPA/ORSEC strictness
   const [railCorridorBoostPct, setRailCorridorBoostPct] = useState<number>(25); // % SNTF rail & road corridor boost
+  const [tourismExpansionPct, setTourismExpansionPct] = useState<number>(30); // % ZET & heritage tourism expansion
 
   const resetLevers = () => {
     setDesalinationBoostM3(450);
@@ -89,9 +94,10 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
     setHealthExpansionPct(15);
     setHazardMitigationStrictness(35);
     setRailCorridorBoostPct(25);
+    setTourismExpansionPct(30);
   };
 
-  // Enrich all 58 wilayas with Geo-Zone & baseline vs policy-adjusted 2030 metrics across 8 sectors
+  // Enrich all 58 wilayas with Geo-Zone & baseline vs policy-adjusted 2030 metrics across 9 sectors
   const enrichedWilayas = useMemo(() => {
     const progressFactor = Math.min(1, Math.max(0.2, horizon / 4));
     const irrigationGain = (precisionIrrigationPct - 45) * 0.28 * progressFactor;
@@ -111,6 +117,9 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
       const baseHazard = getHazardIndex(w);
       const baseTransport = getTransportScore(w);
       const railLinked = hasRailAccess(w);
+      const hotelsCnt = getHotelsCount(w);
+      const heritageCnt = getHeritageSitesCount(w);
+      const baseTourism = getTourismScore(w);
 
       // Policy effect respects territorial realism
       const desalFactor =
@@ -133,20 +142,23 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
       const policyHazard = Math.max(6, Math.round(baseHazard * (1 - (hazardMitigationStrictness / 100) * 0.34 * progressFactor)));
       const transportGain = (railCorridorBoostPct / 100) * (railLinked ? 14 : 22) * progressFactor;
       const policyTransport = Math.min(99, Math.round(baseTransport + transportGain));
+      const tourismGain = (tourismExpansionPct / 100) * (baseTourism < 70 ? 22 : 12) * progressFactor + (railCorridorBoostPct / 100) * 4 * progressFactor;
+      const policyTourism = Math.min(99, Math.round(baseTourism + tourismGain));
 
-      // Composite 8-Sector Vulnerability / Action Priority (0–100, higher = more urgent intervention needed)
+      // Composite 9-Sector Vulnerability / Action Priority (0–100, higher = more urgent intervention needed)
       const urgencyScore = Math.round(
         Math.max(
           0,
           Math.min(
             100,
-            (Math.abs(Math.min(0, baseWater)) / 4.2) * 0.24 +
-              baseDrought * 0.16 +
-              w.flood * 20 +
-              (100 - w.coverage) * 0.14 +
+            (Math.abs(Math.min(0, baseWater)) / 4.2) * 0.22 +
+              baseDrought * 0.15 +
+              w.flood * 19 +
+              (100 - w.coverage) * 0.13 +
               (100 - baseHealth) * 0.14 +
-              baseHazard * 0.16 +
-              (100 - baseTransport) * 0.11
+              baseHazard * 0.15 +
+              (100 - baseTransport) * 0.10 +
+              (100 - baseTourism) * 0.06
           )
         )
       );
@@ -172,6 +184,10 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
         baseTransport,
         policyTransport,
         railLinked,
+        hotelsCnt,
+        heritageCnt,
+        baseTourism,
+        policyTourism,
         urgencyScore
       };
     });
@@ -186,6 +202,7 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
     healthExpansionPct,
     hazardMitigationStrictness,
     railCorridorBoostPct,
+    tourismExpansionPct,
     isAr
   ]);
 
@@ -244,6 +261,13 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
     enrichedWilayas.reduce((acc, w) => acc + w.policyTransport, 0) / Math.max(1, enrichedWilayas.length)
   );
 
+  const avgBaseTourism = Math.round(
+    enrichedWilayas.reduce((acc, w) => acc + w.baseTourism, 0) / Math.max(1, enrichedWilayas.length)
+  );
+  const avgPolicyTourism = Math.round(
+    enrichedWilayas.reduce((acc, w) => acc + w.policyTourism, 0) / Math.max(1, enrichedWilayas.length)
+  );
+
   // Critical Wilayas saved by policy levers
   const severeThirstBaseCount = enrichedWilayas.filter((w) => w.baseWater <= -150).length;
   const severeThirstPolicyCount = enrichedWilayas.filter((w) => w.policyWater <= -150).length;
@@ -268,7 +292,8 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
         avgIndustry: Math.round(group.reduce((s, w) => s + w.policyIndustry, 0) / count),
         avgHealth: Math.round(group.reduce((s, w) => s + w.policyHealth, 0) / count),
         avgHazard: Math.round(group.reduce((s, w) => s + w.policyHazard, 0) / count),
-        avgTransport: Math.round(group.reduce((s, w) => s + w.policyTransport, 0) / count)
+        avgTransport: Math.round(group.reduce((s, w) => s + w.policyTransport, 0) / count),
+        avgTourism: Math.round(group.reduce((s, w) => s + w.policyTourism, 0) / count)
       };
     });
   }, [enrichedWilayas, totalPop]);
@@ -416,6 +441,12 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
             data: geoZoneSummaries.map((g) => g.avgIndustry),
             backgroundColor: '#A78BFA',
             borderRadius: 5
+          },
+          {
+            label: isAr ? 'السياحة والتراث (/100)' : 'Tourism & Heritage (/100)',
+            data: geoZoneSummaries.map((g) => g.avgTourism),
+            backgroundColor: '#FBBF24',
+            borderRadius: 5
           }
         ]
       },
@@ -442,7 +473,7 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
     return selectedGeoZone === 'all' ? enrichedWilayas : enrichedWilayas.filter((w) => w.geo.id === selectedGeoZone);
   }, [enrichedWilayas, selectedGeoZone]);
 
-  // 8-Sector Priority Rankings
+  // 9-Sector Priority Rankings
   const topThirstWilayas = useMemo(() => [...zoneFiltered].sort((a, b) => a.baseWater - b.baseWater).slice(0, 5), [zoneFiltered]);
   const topDroughtWilayas = useMemo(() => [...zoneFiltered].sort((a, b) => b.baseDrought - a.baseDrought).slice(0, 5), [zoneFiltered]);
   const topGrowthWilayas = useMemo(() => [...zoneFiltered].sort((a, b) => b.pop * b.price - a.pop * a.price).slice(0, 5), [zoneFiltered]);
@@ -451,6 +482,7 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
   const topHealthGapWilayas = useMemo(() => [...zoneFiltered].sort((a, b) => a.baseHealth - b.baseHealth).slice(0, 5), [zoneFiltered]);
   const topHazardWilayas = useMemo(() => [...zoneFiltered].sort((a, b) => b.baseHazard - a.baseHazard).slice(0, 5), [zoneFiltered]);
   const topTransportGapWilayas = useMemo(() => [...zoneFiltered].sort((a, b) => a.baseTransport - b.baseTransport).slice(0, 5), [zoneFiltered]);
+  const topTourismWilayas = useMemo(() => [...zoneFiltered].sort((a, b) => b.policyTourism - a.policyTourism).slice(0, 5), [zoneFiltered]);
 
   // Matrix rows with search & sort
   const matrixRows = useMemo(() => {
@@ -472,6 +504,7 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
       if (matrixSortBy === 'health') return a.baseHealth - b.baseHealth;
       if (matrixSortBy === 'hazards') return b.baseHazard - a.baseHazard;
       if (matrixSortBy === 'transport') return a.baseTransport - b.baseTransport;
+      if (matrixSortBy === 'tourism') return b.policyTourism - a.policyTourism;
       return b.urgencyScore - a.urgencyScore;
     });
   }, [zoneFiltered, searchTerm, matrixSortBy]);
@@ -492,12 +525,12 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
               <span>{isAr ? 'مرصد الاستشراف الوطني الجزائر 2030' : 'National Foresight 2030 Observatory'}</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white font-['Sora']">
-              {isAr ? 'الرؤية الوطنية المندمجة للقطاعات الثمانية والتوازن الإقليمي' : 'Integrated 8-Sector Territorial Rebalancing to 2030'}
+              {isAr ? 'الرؤية الوطنية المندمجة للقطاعات التسعة والتوازن الإقليمي' : 'Integrated 9-Sector Territorial Rebalancing to 2030'}
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-3xl">
               {isAr
-                ? 'استشراف كمي شامل عبر 58 ولاية و5 نطاقات جغرافية، يدمج محاكي السياسات الوطنية لعام 2030 (بما فيها الصحة والأخطار الطبيعية والنقل)، مصفوفة الترتيب القطاعي، وتحليل المسارات التراكمية.'
-                : 'Quantitative national synthesis across 58 wilayas & 5 geo-zones featuring an 8-sector 2030 policy lever simulator (including Healthcare, Natural Hazards & Transport/Rail), priority rankings, and trajectory curves.'}
+                ? 'استشراف كمي شامل عبر 58 ولاية و5 نطاقات جغرافية، يدمج محاكي السياسات الوطنية لعام 2030 (بما فيها الصحة والأخطار الطبيعية والنقل والسياحة والتراث)، مصفوفة الترتيب القطاعي، وتحليل المسارات التراكمية.'
+                : 'Quantitative national synthesis across 58 wilayas & 5 geo-zones featuring a 9-sector 2030 policy lever simulator (including Healthcare, Natural Hazards, Transport/Rail & Tourism/Heritage), priority rankings, and trajectory curves.'}
             </p>
           </div>
 
@@ -506,14 +539,14 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
               <span>🇩🇿 Horizon {targetYear}</span>
             </div>
             <div className="bg-[#121F3D] text-slate-300 border border-white/10 px-3 py-1.5 rounded-xl text-xs font-bold">
-              {isAr ? `${wilayas.length} ولاية · 8 قطاعات` : `${wilayas.length} Wilayas · 8 Sectors`}
+              {isAr ? `${wilayas.length} ولاية · 9 قطاعات` : `${wilayas.length} Wilayas · 9 Sectors`}
             </div>
           </div>
         </div>
       </div>
 
-      {/* 2. 9-Card National KPI Grid (100% live computed baseline vs policy impact) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5">
+      {/* 2. 10-Card National KPI Grid (100% live computed baseline vs policy impact) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
         <div className="bg-[#0D172E] border border-white/10 rounded-xl p-4 shadow-lg space-y-1">
           <div className="flex items-center gap-1.5 text-xs text-sky-400 font-semibold">
             <Droplets className="w-3.5 h-3.5" />
@@ -633,6 +666,20 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
             {isAr ? 'الربط السككي والطرق السريعة / 100' : 'Multimodal rail & highway /100'}
           </span>
         </div>
+
+        <div className="bg-[#0D172E] border border-amber-400/25 rounded-xl p-4 shadow-lg space-y-1">
+          <div className="flex items-center gap-1.5 text-xs text-amber-300 font-semibold">
+            <Palmtree className="w-3.5 h-3.5" />
+            <span>{isAr ? 'السياحة والتراث MTA' : 'Tourism & Heritage'}</span>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <b className="text-xl font-mono text-amber-300">{avgBaseTourism}</b>
+            <span className="text-[11px] font-mono text-emerald-400 font-bold">→ {avgPolicyTourism}</span>
+          </div>
+          <span className="text-[10px] text-slate-400 block">
+            {isAr ? 'الجاذبية الفندقية والتراثية / 100' : 'Hospitality & heritage index /100'}
+          </span>
+        </div>
       </div>
 
       {/* 3. National Policy Levers Simulator */}
@@ -646,8 +693,8 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
               </h2>
               <p className="text-[11px] text-slate-400">
                 {isAr
-                  ? 'عدّل الرافعات السبع لقياس أثرها التراكمي على الأمن المائي والغذائي، الصحة العمومية، الوقاية من الكوارث، والربط بالسكك'
-                  : 'Adjust national investment levers to measure real-time impact across water security, food resilience & regional equity'}
+                  ? 'عدّل الرافعات الثماني لقياس أثرها التراكمي على الأمن المائي والغذائي، الصحة العمومية، الوقاية من الكوارث، الربط بالسكك، والسياحة والتراث'
+                  : 'Adjust 8 national investment levers to measure real-time impact across water, agronomy, health, hazards, rail, and tourism'}
               </p>
             </div>
           </div>
@@ -784,9 +831,9 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
             </span>
           </div>
 
-          <div className="bg-[#101D38] border border-cyan-500/20 rounded-xl p-3 space-y-1.5 sm:col-span-2">
+          <div className="bg-[#101D38] border border-cyan-500/20 rounded-xl p-3 space-y-1.5">
             <div className="flex justify-between text-xs">
-              <span className="text-slate-300 font-medium">{isAr ? '🚆 تمديد خطوط السكك SNTF والممرات اللوجستية' : '🚆 SNTF Rail & Multimodal Corridor Boost'}</span>
+              <span className="text-slate-300 font-medium">{isAr ? '🚆 تمديد خطوط السكك SNTF والممرات' : '🚆 SNTF Rail & Corridor Boost'}</span>
               <b className="font-mono text-cyan-400">+{railCorridorBoostPct}%</b>
             </div>
             <input
@@ -799,7 +846,26 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
               className="w-full accent-cyan-400 h-1.5 cursor-pointer"
             />
             <span className="block text-[10px] text-slate-400">
-              {isAr ? 'فك العزلة السككية عن الهضاب والجنوب وتسريع الشحن الصناعي والفلاحي' : 'Connects rail corridors & speeds multimodal logistics'}
+              {isAr ? 'فك العزلة السككية عن الهضاب والجنوب وتسريع الشحن' : 'Connects rail corridors & speeds multimodal logistics'}
+            </span>
+          </div>
+
+          <div className="bg-[#101D38] border border-amber-400/25 rounded-xl p-3 space-y-1.5">
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-300 font-medium">{isAr ? '🏝️ مناطق التوسع السياحي ZET والتراث' : '🏝️ ZET Tourism & Heritage'}</span>
+              <b className="font-mono text-amber-300">+{tourismExpansionPct}%</b>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="5"
+              value={tourismExpansionPct}
+              onChange={(e) => setTourismExpansionPct(Number(e.target.value))}
+              className="w-full accent-amber-400 h-1.5 cursor-pointer"
+            />
+            <span className="block text-[10px] text-slate-400">
+              {isAr ? 'رفع الطاقة الفندقية وتثمين المواقع التراثية والصحراوية' : 'Boosts hospitality beds, ZET resorts & eco-heritage trails'}
             </span>
           </div>
         </div>
@@ -877,8 +943,8 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
         ))}
       </div>
 
-      {/* 6. 8-Sector Priority Rankings Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* 6. 9-Sector Priority Rankings Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Water Hotspots */}
         <div className="bg-[#0D172E] border border-white/10 rounded-2xl p-4 shadow-xl space-y-3">
           <div className="flex items-center gap-2 text-sky-400 font-bold text-xs border-b border-white/10 pb-2">
@@ -1080,6 +1146,33 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
             ))}
           </div>
         </div>
+
+        {/* Top Tourism & Heritage Poles */}
+        <div className="bg-[#0D172E] border border-amber-400/25 rounded-2xl p-4 shadow-xl space-y-3">
+          <div className="flex items-center gap-2 text-amber-300 font-bold text-xs border-b border-white/10 pb-2">
+            <Palmtree className="w-4 h-4" />
+            <span>{isAr ? 'الأقطاب السياحية والتراثية الرائدة MTA' : 'Top Tourism & Heritage Poles'}</span>
+          </div>
+          <div className="space-y-1.5">
+            {topTourismWilayas.map((w, idx) => (
+              <div
+                key={w.num}
+                onClick={() => handleWilayaJump(w)}
+                className="flex items-center justify-between p-2 bg-[#121F3D] rounded-lg border border-white/5 hover:border-amber-400/40 transition cursor-pointer text-xs"
+              >
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="w-4 h-4 rounded-full bg-amber-400/20 text-amber-300 flex items-center justify-center font-bold text-[10px] shrink-0">
+                    {idx + 1}
+                  </span>
+                  <b className="text-white truncate">{w.num}. {isAr ? w.n : w.en}</b>
+                </div>
+                <span className="font-mono text-amber-300 font-bold shrink-0">
+                  {w.policyTourism}/100 · {w.heritageCnt}🏛️
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* 7. Complete National Strategic Rebalancing Matrix (All 58 Wilayas) */}
@@ -1124,6 +1217,7 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
               <option value="health">{isAr ? 'الترتيب: التغطية الصحية' : 'Sort: Health Access'}</option>
               <option value="hazards">{isAr ? 'الترتيب: الأخطار الطبيعية' : 'Sort: Natural Hazards'}</option>
               <option value="transport">{isAr ? 'الترتيب: النقل والسكك' : 'Sort: Transport & Rail'}</option>
+              <option value="tourism">{isAr ? 'الترتيب: السياحة والتراث' : 'Sort: Tourism & Heritage'}</option>
             </select>
           </div>
         </div>
@@ -1142,6 +1236,7 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
                 <th className="py-2.5 px-2.5">{isAr ? 'الصحة' : 'Health'}</th>
                 <th className="py-2.5 px-2.5">{isAr ? 'الأخطار' : 'Hazards'}</th>
                 <th className="py-2.5 px-2.5">{isAr ? 'النقل' : 'Transport'}</th>
+                <th className="py-2.5 px-2.5">{isAr ? 'السياحة' : 'Tourism'}</th>
                 <th className="py-2.5 px-2.5">{isAr ? 'الأولوية' : 'Priority'}</th>
                 <th className="py-2.5 px-2.5">{isAr ? 'الخريطة' : 'Map'}</th>
               </tr>
@@ -1184,6 +1279,9 @@ export const Foresight2030Dashboard: React.FC<Foresight2030DashboardProps> = ({
                     </td>
                     <td className="py-2 px-2.5 font-mono whitespace-nowrap">
                       <span className="text-cyan-300">{w.baseTransport}</span> → <span className="text-emerald-400">{w.policyTransport}</span> {w.railLinked ? '🚆' : ''}
+                    </td>
+                    <td className="py-2 px-2.5 font-mono whitespace-nowrap">
+                      <span className="text-amber-300">{w.baseTourism}</span> → <span className="text-emerald-400">{w.policyTourism}</span>
                     </td>
                     <td className="py-2 px-2.5">
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${priBadge}`}>

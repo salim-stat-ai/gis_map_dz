@@ -7,7 +7,7 @@
 import React, { useState } from 'react';
 import { ScenarioPathway, WilayaRecord } from '../types';
 import { generateAllPathways, DEFAULT_SCENARIO_DRIVERS, ScenarioDriverSettings } from '../engines/scenario';
-import { GitBranch, Sliders, Droplets, Wheat, Building2, Factory, RefreshCw, HeartPulse, ShieldAlert, TrainFront } from 'lucide-react';
+import { GitBranch, Sliders, Droplets, Wheat, Building2, Factory, RefreshCw, HeartPulse, ShieldAlert, TrainFront, Palmtree } from 'lucide-react';
 
 interface ScenarioCenterProps {
   wilayas: WilayaRecord[];
@@ -109,7 +109,7 @@ export const ScenarioCenter: React.FC<ScenarioCenterProps> = ({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Pop Growth */}
           <div className="bg-[#101D38] p-3 rounded-xl border border-white/5 space-y-1.5">
             <div className="flex justify-between text-xs">
@@ -206,8 +206,8 @@ export const ScenarioCenter: React.FC<ScenarioCenterProps> = ({
             <input
               type="range"
               min="0"
-              max="45"
-              step="2"
+              max="100"
+              step="5"
               value={drivers.healthInfraInvestmentPct}
               onChange={(e) => setDrivers({ ...drivers, healthInfraInvestmentPct: Number(e.target.value) })}
               className="w-full accent-rose-400 h-1.5 cursor-pointer"
@@ -240,11 +240,28 @@ export const ScenarioCenter: React.FC<ScenarioCenterProps> = ({
             <input
               type="range"
               min="0"
-              max="50"
-              step="2"
+              max="100"
+              step="5"
               value={drivers.transportRailExpansionPct}
               onChange={(e) => setDrivers({ ...drivers, transportRailExpansionPct: Number(e.target.value) })}
               className="w-full accent-cyan-400 h-1.5 cursor-pointer"
+            />
+          </div>
+
+          {/* Tourism & Heritage Investment */}
+          <div className="bg-[#101D38] p-3 rounded-xl border border-white/5 space-y-1.5">
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-300">{isAr ? 'الاستثمار السياحي والفندقي' : 'Tourism & Heritage Capex'}</span>
+              <b className="text-yellow-400 font-mono">+{drivers.tourismCapexInvestmentPct}%</b>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="5"
+              value={drivers.tourismCapexInvestmentPct}
+              onChange={(e) => setDrivers({ ...drivers, tourismCapexInvestmentPct: Number(e.target.value) })}
+              className="w-full accent-yellow-400 h-1.5 cursor-pointer"
             />
           </div>
         </div>
@@ -350,6 +367,14 @@ export const ScenarioCenter: React.FC<ScenarioCenterProps> = ({
                     <span>{isAr ? 'ربط النقل والسكك' : 'Transport & Rail'}</span>
                   </span>
                   <b className="font-mono text-sm text-cyan-400">{impact.transportConnectivityScore}/100</b>
+                </div>
+
+                <div className="flex justify-between items-center bg-[#091224] p-2.5 rounded-lg border border-white/5">
+                  <span className="flex items-center gap-1.5 text-slate-300">
+                    <Palmtree className="w-3.5 h-3.5 text-yellow-400" />
+                    <span>{isAr ? 'الجاذبية السياحية والتراث' : 'Tourism & Heritage'}</span>
+                  </span>
+                  <b className="font-mono text-sm text-yellow-400">{impact.tourismAttractivenessIndex}/100</b>
                 </div>
               </div>
 

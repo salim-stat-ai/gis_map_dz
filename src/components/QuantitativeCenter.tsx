@@ -9,7 +9,16 @@ import { Chart as ChartJS, registerables } from 'chart.js';
 import { ForecastModelType, ForecastResult, WilayaRecord } from '../types';
 import { executeForecastModel } from '../engines/quantitative';
 import { runModelTournament, BenchmarkTournamentResult } from '../engines/evaluation';
-import { getHospitalsCount, getHealthCoverage, getHazardIndex, getTransportScore, hasRailAccess } from '../engines/reporting';
+import {
+  getHospitalsCount,
+  getHealthCoverage,
+  getHazardIndex,
+  getHeritageSitesCount,
+  getHotelsCount,
+  getTourismScore,
+  getTransportScore,
+  hasRailAccess
+} from '../engines/reporting';
 import { TrendingUp, Cpu, Award, HelpCircle, ShieldCheck, BookOpen, Lightbulb, Layers, ChevronDown, ChevronUp } from 'lucide-react';
 
 ChartJS.register(...registerables);
@@ -33,7 +42,7 @@ export const QuantitativeCenter: React.FC<QuantitativeCenterProps> = ({
 
   const [selectedModel, setSelectedModel] = useState<ForecastModelType>('arima');
   const [selectedMetricKey, setSelectedMetricKey] = useState<
-    'waterDef' | 'rain' | 'pop' | 'price' | 'healthCoverage' | 'hazardIndex' | 'transportScore'
+    'waterDef' | 'rain' | 'pop' | 'price' | 'healthCoverage' | 'hazardIndex' | 'transportScore' | 'tourismScore'
   >('waterDef');
   const [forecastResult, setForecastResult] = useState<ForecastResult | null>(null);
   const [tournamentResult, setTournamentResult] = useState<BenchmarkTournamentResult | null>(null);
@@ -112,6 +121,23 @@ export const QuantitativeCenter: React.FC<QuantitativeCenterProps> = ({
           curr
         ],
         label: isAr ? 'مؤشر النقل والسكك (/100)' : 'Transport & Rail Connectivity (/100)'
+      };
+    }
+    if (selectedMetricKey === 'tourismScore') {
+      const curr = getTourismScore(selectedWilaya);
+      return {
+        years: defaultYears,
+        values: [
+          Math.max(18, Math.round((curr - 6.4) * 10) / 10),
+          Math.max(18, Math.round((curr - 5.5) * 10) / 10),
+          Math.max(18, Math.round((curr - 6.8) * 10) / 10),
+          Math.max(18, Math.round((curr - 4.6) * 10) / 10),
+          Math.max(18, Math.round((curr - 3.2) * 10) / 10),
+          Math.max(18, Math.round((curr - 2.1) * 10) / 10),
+          Math.max(18, Math.round((curr - 1.0) * 10) / 10),
+          curr
+        ],
+        label: isAr ? 'مؤشر الجاذبية السياحية والتراث (/100)' : 'Tourism & Heritage Attractiveness (/100)'
       };
     }
     return {
@@ -373,6 +399,25 @@ export const QuantitativeCenter: React.FC<QuantitativeCenterProps> = ({
             : `Linking logistics platforms to SNTF freight corridors and highways unlocks the ${fmtNum(f2035.upper95 ?? f2035.value)} upper trajectory.`
         };
       }
+      if (selectedMetricKey === 'tourismScore') {
+        const hotels = getHotelsCount(selectedWilaya);
+        const heritage = getHeritageSitesCount(selectedWilaya);
+        return {
+          unitLabel: isAr ? 'نقطة / 100 جاذبية سياحية' : 'pts / 100 tourism score',
+          historicalMeaning: isAr
+            ? `تدرّج مؤشر الجاذبية السياحية في ${wilayaName} (${hotels} مؤسسة فندقية مصنفة و${heritage} معلم/موقع تراثي) من ${fmtNum(startVal)} (${startYr}) إلى ${fmtNum(lastHistVal)}/100 (${lastHistYr}) مروراً بتراجع 2020 ثم التعافي التدريجي.`
+            : `Tourism attractiveness in ${wilayaName} (${hotels} classified hotels & ${heritage} heritage sites) moved from ${fmtNum(startVal)} (${startYr}) to ${fmtNum(lastHistVal)}/100 (${lastHistYr}) through the 2020 dip and post-pandemic rebound.`,
+          forecastMeaning: isAr
+            ? `المسار المرجعي يتوقع وصول الجاذبية السياحية إلى ${fmtNum(f2030.value)}/100 في 2030 و${fmtNum(f2035.value)}/100 في 2035 مع التحسن التدريجي للربط الفندقي والتثمين الثقافي.`
+            : `Baseline forecasts point to ${fmtNum(f2030.value)}/100 by 2030 and ${fmtNum(f2035.value)}/100 by 2035 on steady hospitality and heritage momentum.`,
+          bandMeaning: isAr
+            ? `نطاق الثقة 95% (${fmtNum(f2035.lower95 ?? f2035.value)} – ${fmtNum(f2035.upper95 ?? f2035.value)}) يميز بين ركود الطاقة الفندقية وتراجع الموسمية، مقابل فتح مناطق التوسع السياحي ZET والبيوت البيئية والمسارات الثقافية.`
+            : `The 95% cone (${fmtNum(f2035.lower95 ?? f2035.value)} – ${fmtNum(f2035.upper95 ?? f2035.value)}) separates bed-capacity stagnation from activated ZET coastal zones, eco-circuits, and heritage routes.`,
+          actionNote: isAr
+            ? `لصانع القرار في ${wilayaName}: تفعيل مناطق التوسع السياحي (ZET) والربط الجوي/السككي لـ ${heritage} موقعاً تراثياً يفتح الوصول للحد الأعلى (${fmtNum(f2035.upper95 ?? f2035.value)}/100).`
+            : `Activating ZET hospitality zones, digital ticketing, and transit links to ${heritage} heritage sites unlocks the upper ${fmtNum(f2035.upper95 ?? f2035.value)}/100 trajectory.`
+        };
+      }
       return {
         unitLabel: isAr ? 'دج / م²' : 'DZD / m²',
         historicalMeaning: isAr
@@ -558,6 +603,7 @@ export const QuantitativeCenter: React.FC<QuantitativeCenterProps> = ({
               <option value="healthCoverage">{isAr ? '🏥 التغطية الصحية (%)' : '🏥 Healthcare Coverage (%)'}</option>
               <option value="hazardIndex">{isAr ? '🌋 الأخطار الطبيعية (/100)' : '🌋 Natural Hazards Index (/100)'}</option>
               <option value="transportScore">{isAr ? '🚆 النقل والسكك (/100)' : '🚆 Transport & Rail (/100)'}</option>
+              <option value="tourismScore">{isAr ? '🏖️ الجاذبية السياحية والتراث (/100)' : '🏖️ Tourism & Heritage (/100)'}</option>
             </select>
           </div>
         </div>

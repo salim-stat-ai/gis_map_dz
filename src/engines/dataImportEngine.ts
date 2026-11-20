@@ -18,7 +18,10 @@ import {
   getWildfireRisk,
   getHazardIndex,
   getTransportScore,
-  hasRailAccess
+  hasRailAccess,
+  getHotelsCount,
+  getHeritageSitesCount,
+  getTourismScore
 } from './reporting';
 
 export interface ImportField {
@@ -53,7 +56,10 @@ export const IMPORT_FIELDS: ImportField[] = [
   { k: 'wildfireRisk', label: 'Wildfire Risk 0-1', labelAr: 'خطر الحرائق 0-1', aliases: ['wildfirerisk', 'wildfire_risk', 'incendie', 'forest_fire'] },
   { k: 'hazardIndex', label: 'Hazard Index /100', labelAr: 'مؤشر الأخطار /100', aliases: ['hazardindex', 'hazard_index', 'multirisques', 'natural_hazards'] },
   { k: 'transportScore', label: 'Transport /100', labelAr: 'مؤشر النقل والسكك /100', aliases: ['transportscore', 'transport_score', 'transport', 'multimodal_transport'] },
-  { k: 'railAccess', label: 'Rail Access (0/1)', labelAr: 'ربط السكة الحديدية', aliases: ['railaccess', 'rail_access', 'sntf', 'rail', 'railway'] }
+  { k: 'railAccess', label: 'Rail Access (0/1)', labelAr: 'ربط السكة الحديدية', aliases: ['railaccess', 'rail_access', 'sntf', 'rail', 'railway'] },
+  { k: 'hotels', label: 'Hotels Count', labelAr: 'المؤسسات الفندقية (MTA)', aliases: ['hotels', 'hotel', 'hotellerie', 'hotels_count', 'accommodations'] },
+  { k: 'heritageSites', label: 'Heritage Sites', labelAr: 'المعالم والمواقع التراثية', aliases: ['heritagesites', 'heritage_sites', 'heritage', 'patrimoine', 'unesco_sites'] },
+  { k: 'tourismScore', label: 'Tourism Score /100', labelAr: 'مؤشر السياحة /100', aliases: ['tourismscore', 'tourism_score', 'tourism', 'tourisme', 'tourism_index'] }
 ];
 
 export interface PresetSource {
@@ -103,6 +109,15 @@ export const IMPORT_PRESETS: PresetSource[] = [
     url: 'https://overpass-api.de/api/interpreter?data=%5Bout%3Ajson%5D%3Barea%5B%22ISO3166-1%22%3D%22DZ%22%5D%3Bnode%5B%22railway%22%3D%22station%22%5D%28area%29%3Bout+50%3B',
     formatHint: 'json',
     description: 'OpenStreetMap query for SNTF railway hubs and transport interchanges.'
+  },
+  {
+    id: 'osm-tourism',
+    name: 'OSM — heritage sites, museums & hotels (Overpass)',
+    nameAr: 'OSM — المعالم التراثية والمتاحف والفنادق بالجزائر (Overpass)',
+    group: 'algeria',
+    url: 'https://overpass-api.de/api/interpreter?data=%5Bout%3Ajson%5D%3Barea%5B%22ISO3166-1%22%3D%22DZ%22%5D%3B%28node%5B%22tourism%22%3D%22attraction%22%5D%28area%29%3Bnode%5B%22historic%22%5D%28area%29%3B%29%3Bout+50%3B',
+    formatHint: 'json',
+    description: 'OpenStreetMap Overpass query extracting heritage monuments, archaeological landmarks, and tourism attractions across Algeria.'
   },
   {
     id: 'ons-economy',
@@ -484,7 +499,7 @@ export function downloadBlob(blob: Blob, fileName: string) {
 
 export function downloadCsvTemplate() {
   const headers = IMPORT_FIELDS.map(f => f.aliases[0]).join(',');
-  const exampleRow = 'Setif,36.19,5.41,1800,95000,0.15,82,450,0.55,3,900,-12,48,78,80,88,82,70,24,78,0.68,0.34,42,84,1';
+  const exampleRow = 'Setif,36.19,5.41,1800,95000,0.15,82,450,0.55,3,900,-12,48,78,80,88,82,70,24,78,0.68,0.34,42,84,1,28,9,72';
   const csvContent = '\uFEFF' + headers + '\n' + exampleRow + '\n';
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
   downloadBlob(blob, 'gis_map-template.csv');
@@ -527,6 +542,9 @@ export function exportDatasetAsCsv(wilayas: WilayaRecord[], targetYear: number =
     hazard_index: getHazardIndex(w),
     transport_score: getTransportScore(w),
     rail_access: hasRailAccess(w) ? 1 : 0,
+    hotels: getHotelsCount(w),
+    heritage_sites: getHeritageSitesCount(w),
+    tourism_score: getTourismScore(w),
     forecast_water_2030: predictWater(w, targetYear),
     drought_risk_2030: cropRisk(w, targetYear),
     urban_growth_2030: urbanGrowth(w, targetYear)
@@ -568,6 +586,9 @@ export function exportDatasetAsExcel(wilayas: WilayaRecord[], targetYear: number
     'Natural Hazard Index (/100)': getHazardIndex(w),
     'Transport & Rail Score (/100)': getTransportScore(w),
     'SNTF Rail Connected': hasRailAccess(w) ? 'Yes' : 'No',
+    'Classified Hotels (MTA)': getHotelsCount(w),
+    'Heritage Sites Count': getHeritageSitesCount(w),
+    'Tourism & Heritage Score (/100)': getTourismScore(w),
     [`Forecast Water Deficit ${targetYear}`]: predictWater(w, targetYear),
     [`Drought Risk ${targetYear}`]: cropRisk(w, targetYear),
     [`Urban Growth ${targetYear}`]: urbanGrowth(w, targetYear)
@@ -616,6 +637,9 @@ export function exportDatasetAsGeoJson(wilayas: WilayaRecord[], targetYear: numb
         hazardIndex: getHazardIndex(w),
         transportScore: getTransportScore(w),
         railAccess: hasRailAccess(w),
+        hotels: getHotelsCount(w),
+        heritageSites: getHeritageSitesCount(w),
+        tourismScore: getTourismScore(w),
         forecast_water: predictWater(w, targetYear),
         drought_risk: cropRisk(w, targetYear),
         urban_growth: urbanGrowth(w, targetYear)
@@ -637,9 +661,10 @@ export function exportDatasetAsKml(wilayas: WilayaRecord[], targetYear: number =
     const healthCov = getHealthCoverage(w);
     const hazardIdx = getHazardIndex(w);
     const transportIdx = getTransportScore(w);
+    const tourismIdx = getTourismScore(w);
     return `<Placemark>
   <name>${w.en} (${w.n})</name>
-  <description>Water Deficit: ${w.waterDef} | Health: ${healthCov}% | Hazard: ${hazardIdx}/100 | Transport: ${transportIdx}/100 | Forecast ${targetYear}: ${fWater}</description>
+  <description>Water Deficit: ${w.waterDef} | Health: ${healthCov}% | Hazard: ${hazardIdx}/100 | Transport: ${transportIdx}/100 | Tourism: ${tourismIdx}/100 | Forecast ${targetYear}: ${fWater}</description>
   <Point><coordinates>${w.lon},${w.lat}</coordinates></Point>
   <ExtendedData>
     <Data name="code"><value>${w.num}</value></Data>
@@ -652,6 +677,7 @@ export function exportDatasetAsKml(wilayas: WilayaRecord[], targetYear: number =
     <Data name="healthCoverage"><value>${healthCov}</value></Data>
     <Data name="hazardIndex"><value>${hazardIdx}</value></Data>
     <Data name="transportScore"><value>${transportIdx}</value></Data>
+    <Data name="tourismScore"><value>${tourismIdx}</value></Data>
     <Data name="forecast_water_${targetYear}"><value>${fWater}</value></Data>
     <Data name="drought_risk_${targetYear}"><value>${dRisk}</value></Data>
     <Data name="urban_growth_${targetYear}"><value>${uGrowth}</value></Data>
@@ -680,6 +706,9 @@ export function exportDatasetAsJson(wilayas: WilayaRecord[], targetYear: number 
     hazardIndex: getHazardIndex(w),
     transportScore: getTransportScore(w),
     railAccess: hasRailAccess(w),
+    hotels: getHotelsCount(w),
+    heritageSites: getHeritageSitesCount(w),
+    tourismScore: getTourismScore(w),
     forecastWaterDeficit2030: predictWater(w, targetYear),
     droughtRisk2030: cropRisk(w, targetYear),
     urbanGrowth2030: urbanGrowth(w, targetYear)

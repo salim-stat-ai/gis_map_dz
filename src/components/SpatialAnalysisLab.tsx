@@ -21,7 +21,7 @@ import {
   computeRegionalSummaries,
   computeProximityAnalysis
 } from '../engines/gis';
-import { getHazardIndex, getHealthCoverage, getTransportScore } from '../engines/reporting';
+import { getHazardIndex, getHealthCoverage, getTourismScore, getTransportScore } from '../engines/reporting';
 import {
   Activity,
   Flame,
@@ -58,7 +58,8 @@ type SpatialMetricKey =
   | 'pop'
   | 'healthCoverage'
   | 'hazardIndex'
-  | 'transportScore';
+  | 'transportScore'
+  | 'tourismScore';
 type SubTabKey = 'autocorrelation' | 'regression' | 'kde_kriging' | 'proximity' | 'regional_drilldown' | 'ahp';
 
 export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
@@ -79,7 +80,7 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
   const [hotspotSearch, setHotspotSearch] = useState<string>('');
 
   const [regDepVar, setRegDepVar] = useState<
-    'waterDef' | 'price' | 'industry' | 'coverage' | 'healthCoverage' | 'hazardIndex' | 'transportScore'
+    'waterDef' | 'price' | 'industry' | 'coverage' | 'healthCoverage' | 'hazardIndex' | 'transportScore' | 'tourismScore'
   >('waterDef');
 
   const [kdeBandwidthKm, setKdeBandwidthKm] = useState<number>(140);
@@ -93,7 +94,7 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
   const [selectedRegionId, setSelectedRegionId] = useState<string>('all');
 
   const [ahpWeights, setAhpWeights] = useState({
-    water: 20,
+    water: 15,
     roads: 15,
     energy: 10,
     labor: 10,
@@ -102,7 +103,8 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
     price: 5,
     health: 10,
     hazardSafety: 10,
-    transport: 5
+    transport: 5,
+    tourism: 5
   });
 
   // Chart refs
@@ -137,6 +139,7 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
       if (activeSpatialMetric === 'healthCoverage') return getHealthCoverage(w);
       if (activeSpatialMetric === 'hazardIndex') return getHazardIndex(w);
       if (activeSpatialMetric === 'transportScore') return getTransportScore(w);
+      if (activeSpatialMetric === 'tourismScore') return getTourismScore(w);
       return w.waterDef;
     };
   }, [activeSpatialMetric]);
@@ -153,7 +156,8 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
       pop: { en: 'Population (k)', ar: 'السكان (بالآلاف)' },
       healthCoverage: { en: 'Healthcare Coverage (%)', ar: 'التغطية الصحية (%)' },
       hazardIndex: { en: 'Natural Hazard Index (/100)', ar: 'مؤشر الأخطار الطبيعية (/100)' },
-      transportScore: { en: 'Transport & Rail Score (/100)', ar: 'مؤشر النقل والسكك (/100)' }
+      transportScore: { en: 'Transport & Rail Score (/100)', ar: 'مؤشر النقل والسكك (/100)' },
+      tourismScore: { en: 'Tourism & Heritage Attractiveness (/100)', ar: 'الجاذبية السياحية والتراث (/100)' }
     };
     return isAr ? labels[activeSpatialMetric].ar : labels[activeSpatialMetric].en;
   }, [activeSpatialMetric, isAr]);
@@ -186,7 +190,8 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
       { id: 'price', name: 'Land Price Affordability', nameAr: 'تنافسية العقار', weight: ahpWeights.price },
       { id: 'health', name: 'Healthcare Readiness', nameAr: 'الجاهزية الصحية', weight: ahpWeights.health },
       { id: 'hazardSafety', name: 'Natural Hazard Safety', nameAr: 'الأمان من الأخطار', weight: ahpWeights.hazardSafety },
-      { id: 'transport', name: 'Rail & Multimodal Transport', nameAr: 'السكك والنقل', weight: ahpWeights.transport }
+      { id: 'transport', name: 'Rail & Multimodal Transport', nameAr: 'السكك والنقل', weight: ahpWeights.transport },
+      { id: 'tourism', name: 'Tourism & Heritage Potential', nameAr: 'السياحة والتراث والضيافة', weight: ahpWeights.tourism }
     ],
     [ahpWeights]
   );
@@ -201,25 +206,28 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
       m === 'coverage' ||
       m === 'healthCoverage' ||
       m === 'hazardIndex' ||
-      m === 'transportScore'
+      m === 'transportScore' ||
+      m === 'tourismScore'
     ) {
       setRegDepVar(m);
     }
   };
 
-  const applyAhpPreset = (preset: 'balanced' | 'industry' | 'agri' | 'commerce' | 'health' | 'transport') => {
+  const applyAhpPreset = (preset: 'balanced' | 'industry' | 'agri' | 'commerce' | 'health' | 'transport' | 'tourism') => {
     if (preset === 'industry') {
-      setAhpWeights({ water: 10, roads: 15, energy: 20, labor: 10, soil: 5, coverage: 5, price: 5, health: 5, hazardSafety: 10, transport: 15 });
+      setAhpWeights({ water: 10, roads: 15, energy: 20, labor: 10, soil: 5, coverage: 5, price: 5, health: 5, hazardSafety: 10, transport: 10, tourism: 5 });
     } else if (preset === 'agri') {
-      setAhpWeights({ water: 30, roads: 10, energy: 5, labor: 10, soil: 25, coverage: 5, price: 5, health: 0, hazardSafety: 5, transport: 5 });
+      setAhpWeights({ water: 30, roads: 10, energy: 5, labor: 10, soil: 25, coverage: 5, price: 5, health: 0, hazardSafety: 5, transport: 5, tourism: 0 });
     } else if (preset === 'commerce') {
-      setAhpWeights({ water: 5, roads: 20, energy: 5, labor: 10, soil: 5, coverage: 20, price: 10, health: 5, hazardSafety: 5, transport: 15 });
+      setAhpWeights({ water: 5, roads: 20, energy: 5, labor: 10, soil: 5, coverage: 20, price: 10, health: 5, hazardSafety: 5, transport: 10, tourism: 5 });
     } else if (preset === 'health') {
-      setAhpWeights({ water: 10, roads: 10, energy: 10, labor: 10, soil: 0, coverage: 5, price: 5, health: 30, hazardSafety: 15, transport: 5 });
+      setAhpWeights({ water: 10, roads: 10, energy: 10, labor: 10, soil: 0, coverage: 5, price: 5, health: 30, hazardSafety: 15, transport: 5, tourism: 0 });
     } else if (preset === 'transport') {
-      setAhpWeights({ water: 5, roads: 25, energy: 5, labor: 5, soil: 0, coverage: 10, price: 5, health: 5, hazardSafety: 10, transport: 30 });
+      setAhpWeights({ water: 5, roads: 25, energy: 5, labor: 5, soil: 0, coverage: 10, price: 5, health: 5, hazardSafety: 10, transport: 25, tourism: 5 });
+    } else if (preset === 'tourism') {
+      setAhpWeights({ water: 10, roads: 10, energy: 5, labor: 5, soil: 0, coverage: 10, price: 5, health: 5, hazardSafety: 10, transport: 10, tourism: 30 });
     } else {
-      setAhpWeights({ water: 20, roads: 15, energy: 10, labor: 10, soil: 10, coverage: 5, price: 5, health: 10, hazardSafety: 10, transport: 5 });
+      setAhpWeights({ water: 15, roads: 15, energy: 10, labor: 10, soil: 10, coverage: 5, price: 5, health: 10, hazardSafety: 10, transport: 5, tourism: 5 });
     }
   };
 
@@ -631,7 +639,8 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
       price: '#F43F5E',
       health: '#FB7185',
       hazardSafety: '#F97316',
-      transport: '#22D3EE'
+      transport: '#22D3EE',
+      tourism: '#FBBF24'
     };
 
     ahpChartInst.current = new ChartJS(ahpChartRef.current, {
@@ -701,6 +710,7 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
               <option value="healthCoverage">{isAr ? '🏥 التغطية الصحية (Health %)' : '🏥 Healthcare Access %'}</option>
               <option value="hazardIndex">{isAr ? '🌋 الأخطار الطبيعية (Natural Hazards)' : '🌋 Composite Natural Hazards'}</option>
               <option value="transportScore">{isAr ? '🚆 النقل والربط متعدد الوسائط (Transport)' : '🚆 Multimodal Transport & Rail'}</option>
+              <option value="tourismScore">{isAr ? '🏖️ السياحة والتراث والضيافة (Tourism)' : '🏖️ Tourism & Heritage Score'}</option>
             </select>
           </div>
         </div>
@@ -1043,6 +1053,7 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
                   <option value="healthCoverage">{isAr ? 'المتغير التابع: التغطية الصحية' : 'Dep: Healthcare Coverage'}</option>
                   <option value="hazardIndex">{isAr ? 'المتغير التابع: الأخطار الطبيعية' : 'Dep: Natural Hazard Index'}</option>
                   <option value="transportScore">{isAr ? 'المتغير التابع: النقل والسكك' : 'Dep: Transport & Rail Score'}</option>
+                  <option value="tourismScore">{isAr ? 'المتغير التابع: الجاذبية السياحية' : 'Dep: Tourism & Heritage Score'}</option>
                 </select>
                 <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs px-3 py-1.5 rounded-lg font-mono font-bold">
                   ρ = {spatialReg.rho}
@@ -1617,7 +1628,7 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
                   {isAr ? 'التحليل المكاني متعدد المعايير لاختيار مواقع الاستثمار (AHP Suitability MCDA)' : 'AHP Multi-Criteria Spatial Decision & Suitability Engine'}
                 </h2>
                 <span className="text-xs text-slate-400">
-                  {isAr ? 'تخصيص 10 معايير استراتيجية (بما فيها الصحة والأمان من الأخطار والنقل) مع تدقيق الاتساق CR' : '10 dynamic weights (incl. Health, Hazard Safety & Rail), sector presets & Saaty CR check'}
+                  {isAr ? 'تخصيص 11 معياراً استراتيجياً (بما فيها الصحة، الأخطار، النقل والسياحة) مع تدقيق الاتساق CR' : '11 dynamic weights (incl. Health, Hazard Safety, Rail & Tourism), sector presets & Saaty CR check'}
                 </span>
               </div>
             </div>
@@ -1642,6 +1653,9 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
                 <button type="button" onClick={() => applyAhpPreset('transport')} className="px-2 py-1 rounded hover:bg-white/10 text-cyan-300 cursor-pointer">
                   {isAr ? 'نقل وسكك' : 'Transit/Rail'}
                 </button>
+                <button type="button" onClick={() => applyAhpPreset('tourism')} className="px-2 py-1 rounded hover:bg-white/10 text-yellow-300 cursor-pointer">
+                  {isAr ? 'سياحي' : 'Tourism'}
+                </button>
               </div>
 
               <span className={`text-xs px-2.5 py-1 rounded font-bold flex items-center gap-1.5 ${
@@ -1653,8 +1667,8 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
             </div>
           </div>
 
-          {/* 10 Criteria Sliders */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 bg-[#101D38] p-3.5 rounded-xl border border-white/5">
+          {/* 11 Criteria Sliders */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 bg-[#101D38] p-3.5 rounded-xl border border-white/5">
             {([
               { id: 'water', label: isAr ? '💧 المياه' : '💧 Water', color: 'accent-sky-400 text-sky-400' },
               { id: 'roads', label: isAr ? '🛣️ الطرق' : '🛣️ Roads', color: 'accent-emerald-400 text-emerald-400' },
@@ -1665,7 +1679,8 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
               { id: 'price', label: isAr ? '🏷️ العقار' : '🏷️ Land', color: 'accent-rose-400 text-rose-400' },
               { id: 'health', label: isAr ? '🏥 الصحة' : '🏥 Health', color: 'accent-pink-400 text-pink-400' },
               { id: 'hazardSafety', label: isAr ? '🛡️ الأمان (أخطار)' : '🛡️ Hazard Safety', color: 'accent-orange-400 text-orange-400' },
-              { id: 'transport', label: isAr ? '🚆 النقل والسكك' : '🚆 Rail/Transit', color: 'accent-teal-400 text-teal-400' }
+              { id: 'transport', label: isAr ? '🚆 النقل والسكك' : '🚆 Rail/Transit', color: 'accent-teal-400 text-teal-400' },
+              { id: 'tourism', label: isAr ? '🏖️ السياحة والتراث' : '🏖️ Tourism & Heritage', color: 'accent-yellow-400 text-yellow-400' }
             ] as const).map(item => (
               <div key={item.id}>
                 <div className="flex justify-between text-xs mb-1">

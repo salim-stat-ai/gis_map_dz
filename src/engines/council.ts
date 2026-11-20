@@ -15,7 +15,10 @@ import {
   getWildfireRisk,
   getHazardIndex,
   getTransportScore,
-  hasRailAccess
+  hasRailAccess,
+  getHotelsCount,
+  getHeritageSitesCount,
+  getTourismScore
 } from './reporting';
 
 function findNearestWilaya(target: WilayaRecord, allWilayas: WilayaRecord[]): { peer: WilayaRecord; distKm: number } {
@@ -79,6 +82,9 @@ export function conveneAiCouncil(
   const wildfirePct = Math.round(getWildfireRisk(targetWilaya) * 100);
   const transportSc = getTransportScore(targetWilaya);
   const railLinked = hasRailAccess(targetWilaya);
+  const tourismSc = getTourismScore(targetWilaya);
+  const hotelsCnt = getHotelsCount(targetWilaya);
+  const heritageCnt = getHeritageSitesCount(targetWilaya);
 
   // Data Quality Audit calibrated to targetWilaya
   const hasHistory = (targetWilaya.historicalWaterDef?.length ?? 0) >= 6;
@@ -87,7 +93,7 @@ export function conveneAiCouncil(
   const stdW = Math.sqrt(histWater.reduce((s, v) => s + Math.pow(v - meanW, 2), 0) / Math.max(1, histWater.length));
   const varianceCoeff = Math.round((stdW / Math.max(1, Math.abs(meanW))) * 100) / 100;
 
-  // Dynamic Consensus Priorities sorted by targetWilaya's actual severity across all 8 layers
+  // Dynamic Consensus Priorities sorted by targetWilaya's actual severity across all 9 layers
   const waterWeight = Math.min(98, Math.round(52 + Math.max(0, -targetWilaya.waterDef) * 1.15 + (targetWilaya.dams === 0 ? 8 : 0)));
   const floodWeight = Math.min(97, Math.round(35 + floodPct * 1.25));
   const hazardWeight = Math.min(98, Math.round(34 + hazardIdx * 0.92));
@@ -95,6 +101,7 @@ export function conveneAiCouncil(
   const droughtWeight = Math.min(95, Math.round(30 + droughtPct * 0.85));
   const transportWeight = Math.min(95, Math.round(30 + (100 - transportSc) * 1.05 + (railLinked ? 0 : 10)));
   const commerceWeight = Math.min(94, Math.round(28 + gapPct * 1.15 + (100 - targetWilaya.roads) * 0.25));
+  const tourismWeight = Math.min(94, Math.round(28 + tourismSc * 0.55 + heritageCnt * 1.1));
 
   const consensusPriorities = [
     {
@@ -156,6 +163,16 @@ export function conveneAiCouncil(
       rationale: isAr
         ? `تعتمد ${targetWilaya.n} على ${targetWilaya.markets} سوقاً بنسبة تغطية ${targetWilaya.coverage}% وطرقات ${targetWilaya.roads}%، ما يخلق فجوة ${gapPct}% تستوجب ربطاً لوجستياً أسرع مع ${peerName} (${distKm} كم).`
         : `${targetWilaya.en} operates ${targetWilaya.markets} markets at ${targetWilaya.coverage}% coverage and ${targetWilaya.roads}% roads; closing its ${gapPct}% supply lag links directly with ${peerName} (${distKm} km).`
+    },
+    {
+      rank: 7,
+      title: `Eco-Tourism, ZET Zones & Heritage Preservation in ${targetWilaya.en} (${tourismSc}/100, ${hotelsCnt} Hotels, ${heritageCnt} Sites)`,
+      titleAr: `السياحة المستدامة وتثمين التراث ومناطق التوسع السياحي في ${targetWilaya.n} (${tourismSc}/100، ${hotelsCnt} فندقاً، ${heritageCnt} معلماً)`,
+      supportingAgents: ['Muse Spark (Map Analyst)', 'ChatGPT (Foresight)', 'DeepSeek (Reasoner)'],
+      weightScore: tourismWeight,
+      rationale: isAr
+        ? `تمتلك ${targetWilaya.n} رصيداً من ${heritageCnt} معالم تراثية و${hotelsCnt} مؤسسة فندقية بمؤشر جاذبية ${tourismSc}/100، ما يتيح تنويع الاقتصاد المحلي وربط المسالك السياحية مع ${peerName} (${distKm} كم).`
+        : `${targetWilaya.en} holds ${heritageCnt} heritage sites and ${hotelsCnt} classified hotels (tourism score ${tourismSc}/100), offering high-value economic diversification linked via ${peerName} (${distKm} km).`
     }
   ]
     .sort((a, b) => b.weightScore - a.weightScore)
@@ -236,6 +253,27 @@ export function conveneAiCouncil(
       rootCause: isAr
         ? `التزامن المكاني في ${targetWilaya.n} بين الحاجة لرفع التغطية الصحية (${healthCov}%) وتخفيض تعرض الأخطار (${hazardIdx}/100) عبر شبكة نقل موثوقة (${transportSc}/100).`
         : `Co-dependence between elevating healthcare coverage (${healthCov}%), hazard safety (${hazardIdx}/100), and multimodal transit (${transportSc}/100).`
+    },
+    {
+      topic: `${targetWilaya.en}: Eco-Heritage Preservation (${heritageCnt} Sites) vs Rapid Hospitality & Industrial Expansion`,
+      topicAr: `${targetWilaya.n}: صون التراث والمعالم (${heritageCnt} مواقع) مقابل التوسع الفندقي والصناعي المتسارع`,
+      contendingViews: [
+        {
+          agent: 'Muse Spark (Map Analyst)',
+          perspective: isAr
+            ? `تأمين محيط الحماية للمعالم الـ ${heritageCnt} في ${targetWilaya.n} (سياحة ${tourismSc}/100) وتوجيه مناطق التوسع السياحي ZET بعيداً عن البؤر الصناعية (${industryScore}/100).`
+            : `Enforce strict cultural-heritage buffers around ${targetWilaya.en}'s ${heritageCnt} sites while isolating ZET tourism zones from industrial emissions.`
+        },
+        {
+          agent: 'DeepSeek (Deep Reasoner)',
+          perspective: isAr
+            ? `رفع الطاقة الاستيعابية عن ${hotelsCnt} فندقاً عبر الاستثمار الخاص في مناطق التوسع السياحي يحقق عائداً محلياً سريعاً ويستفيد من ربط النقل (${transportSc}/100).`
+            : `Expanding capacity beyond ${hotelsCnt} hotels via private ZET hospitality concessions unlocks immediate local GDP tied to ${transportSc}/100 transport links.`
+        }
+      ],
+      rootCause: isAr
+        ? `ضرورة الموازنة في ${targetWilaya.n} بين استقطاب الاستثمار الفندقي (${hotelsCnt} فندقاً) وصون الهوية المعمارية والبيئية (${tourismSc}/100).`
+        : `Spatial governance balance in ${targetWilaya.en} between ZET hospitality investment (${hotelsCnt} hotels) and heritage integrity (${tourismSc}/100).`
     }
   ];
 
@@ -301,6 +339,15 @@ export function conveneAiCouncil(
       leadOwner: isAr ? `الوكالة الوطنية للسدود والتحويلات (ANBT) — ${targetWilaya.n}` : `ANBT & ${targetWilaya.en} Hydro Commission`,
       timeframe: 'Foresight 2030' as const,
       costBenefitRatio: `1 : ${(3.1 + targetWilaya.soil * 0.02).toFixed(1)}`
+    },
+    {
+      action: isAr
+        ? `تفعيل مناطق التوسع السياحي ZET وصون ${heritageCnt} معلماً تراثياً مع ترقية ${hotelsCnt} فندقاً في ${targetWilaya.n} (السياحة ${tourismSc}/100)`
+        : `Activate ZET tourism zones, preserve ${heritageCnt} heritage sites, and upgrade ${hotelsCnt} hotels in ${targetWilaya.en} (${tourismSc}/100)`,
+      actionAr: `تفعيل مناطق التوسع السياحي ZET وتثمين التراث والفندقة في ${targetWilaya.n} (${tourismSc}/100)`,
+      leadOwner: isAr ? `وزارة السياحة والصناعة التقليدية (MTA / ONT) — ${targetWilaya.n}` : `Ministry of Tourism & Handicrafts (MTA / ONT)`,
+      timeframe: 'Mid-term 2027' as const,
+      costBenefitRatio: `1 : ${(3.0 + tourismSc * 0.02).toFixed(1)}`
     }
   ];
 

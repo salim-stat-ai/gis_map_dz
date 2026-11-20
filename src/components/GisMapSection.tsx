@@ -27,7 +27,10 @@ import {
   getWildfireRisk,
   getHazardIndex,
   hasRailAccess,
-  getTransportScore
+  getTransportScore,
+  getHotelsCount,
+  getHeritageSitesCount,
+  getTourismScore
 } from '../engines/reporting';
 import { classifyWilayaGeoZone, scanNationalEarlyWarnings } from '../engines/earlyWarning';
 import { Info, MapPin, Layers, Droplets, ShieldAlert, TrendingUp, Compass, CheckCircle, Globe, FileText, X, BarChart3, Activity } from 'lucide-react';
@@ -141,7 +144,8 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
     industry: true,
     health: true,
     hazards: true,
-    transport: true
+    transport: true,
+    tourism: true
   });
   const [showAnomalies, setShowAnomalies] = useState<boolean>(true);
   const [actionAlert, setActionAlert] = useState<string | null>(null);
@@ -184,6 +188,10 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
       const tr = getTransportScore(w);
       return tr >= 72 ? '#10B981' : tr >= 50 ? '#F59E0B' : '#EF4444';
     }
+    if (sector === 'tourism') {
+      const t = getTourismScore(w);
+      return t >= 68 ? '#10B981' : t >= 48 ? '#F59E0B' : '#EF4444';
+    }
     // Overall composite
     const risks = [
       w.waterDef < -20 ? 1 : 0,
@@ -204,6 +212,7 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
     if (sector === 'health') return Math.min(26, 7 + getHospitalsCount(w) * 0.48 + (100 - getHealthCoverage(w)) * 0.08);
     if (sector === 'hazards') return Math.min(26, 7 + getHazardIndex(w) * 0.22);
     if (sector === 'transport') return Math.min(26, 7 + getTransportScore(w) * 0.18);
+    if (sector === 'tourism') return Math.min(26, 7 + getTourismScore(w) * 0.16 + getHeritageSitesCount(w) * 0.35);
     return Math.min(26, 10 + w.industry * 0.2);
   };
 
@@ -346,6 +355,25 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
       });
     }
 
+    // 4. Tourism & Heritage Layer Overlay: Coastal, Saharan & UNESCO Heritage Poles
+    if (activeLayers.tourism || currentSector === 'tourism') {
+      wilayas.forEach(w => {
+        const ts = getTourismScore(w);
+        const heritage = getHeritageSitesCount(w);
+        if (ts >= 64 || heritage >= 8) {
+          L.circleMarker([w.lat, w.lon], {
+            radius: Math.min(33, getSizeBySector(w, currentSector) + 5.5),
+            color: '#FBBF24',
+            weight: currentSector === 'tourism' ? 2.4 : 1.5,
+            dashArray: '4,3',
+            fill: false,
+            opacity: currentSector === 'tourism' ? 0.92 : 0.58,
+            interactive: false
+          }).addTo(overlayGroup);
+        }
+      });
+    }
+
     overlayGroup.addTo(map);
     overlayGroupRef.current = overlayGroup;
 
@@ -377,6 +405,9 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
       const firePct = Math.round(getWildfireRisk(w) * 100);
       const trScore = getTransportScore(w);
       const rail = hasRailAccess(w);
+      const tScore = getTourismScore(w);
+      const hotelsCnt = getHotelsCount(w);
+      const heritageCnt = getHeritageSitesCount(w);
 
       const popupContent = `
         <div
@@ -406,6 +437,7 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
             <div>🏥 ${isAr ? 'الصحة:' : 'Health:'} <b style="color:#2DD4BF;">${healthCov}% (${hosp})</b></div>
             <div>🌋 ${isAr ? 'أخطار(ز/ح):' : 'Hazards(S/F):'} <b style="color:#FB923C;">${hazIdx} (${seisPct}/${firePct}%)</b></div>
             <div>🚆 ${isAr ? 'النقل/سكة:' : 'Transport:'} <b style="color:#38BDF8;">${trScore}/100 ${rail ? '🚆' : ''}</b></div>
+            <div>🏖️ ${isAr ? 'السياحة:' : 'Tourism:'} <b style="color:#FBBF24;">${tScore}/100 (${hotelsCnt}🏨/${heritageCnt}🏛️)</b></div>
             <div>⚡ ${isAr ? 'طاقة/طرق:' : 'Power/Roads:'} <b style="color:#fff;">${w.energy}/${w.roads}</b></div>
           </div>
 
@@ -413,7 +445,7 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
 
           <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.1); text-align:center;">
             <span style="display:inline-block; width:100%; background:linear-gradient(90deg, #0284C7, #10B981); color:#fff; font-weight:700; font-size:11px; padding:5px 8px; border-radius:6px;">
-              ${isAr ? '📋 اضغط لعرض كل المعلومات والتشخيص الكامل (21 مؤشراً)' : '📋 Click to view all wilaya details (21 indicators)'}
+              ${isAr ? '📋 اضغط لعرض كل المعلومات والتشخيص الكامل (24 مؤشراً)' : '📋 Click to view all wilaya details (24 indicators)'}
             </span>
           </div>
         </div>
@@ -756,6 +788,7 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
   const healthGapCount = wilayas.filter(w => getHealthCoverage(w) < 50).length;
   const highHazardCount = wilayas.filter(w => getHazardIndex(w) >= 58).length;
   const transportGapCount = wilayas.filter(w => getTransportScore(w) < 50).length;
+  const tourismHubCount = wilayas.filter(w => getTourismScore(w) >= 62).length;
 
   return (
     <>
@@ -848,6 +881,16 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
                 className="rounded accent-sky-400"
               />
               <span>{isAr ? '🚆 النقل: السكك الحديدية والمحاور الكبرى' : '🚆 Transport: Rail corridors & logistics'}</span>
+            </label>
+
+            <label className="flex items-center gap-2.5 cursor-pointer text-slate-300 hover:text-white">
+              <input
+                type="checkbox"
+                checked={activeLayers.tourism}
+                onChange={(e) => setActiveLayers({ ...activeLayers, tourism: e.target.checked })}
+                className="rounded accent-amber-400"
+              />
+              <span>{isAr ? '🏖️ السياحة والتراث: الفنادق والمعالم (MTA)' : '🏖️ Tourism & Heritage: Hotels & sites (MTA)'}</span>
             </label>
           </div>
 
@@ -982,9 +1025,23 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
             </div>
 
             <div className="bg-[#121F3D] p-2.5 rounded-lg border border-white/5">
-              <b className="text-base text-orange-400">{highHazardCount} / {transportGapCount}</b>
+              <b className="text-base text-orange-400">{highHazardCount}</b>
               <span className="block text-[10px] text-slate-400 leading-tight mt-0.5">
-                {isAr ? 'خطر طبيعي / فجوة نقل' : 'High-Hazard / Rail-Gap'}
+                {isAr ? 'أخطار طبيعية مرتفعة' : 'High-Hazard Wilayas'}
+              </span>
+            </div>
+
+            <div className="bg-[#121F3D] p-2.5 rounded-lg border border-white/5">
+              <b className="text-base text-cyan-400">{transportGapCount}</b>
+              <span className="block text-[10px] text-slate-400 leading-tight mt-0.5">
+                {isAr ? 'ولايات بفجوة نقل وسكك' : 'Rail/Transit-Gap'}
+              </span>
+            </div>
+
+            <div className="bg-[#121F3D] p-2.5 rounded-lg border border-white/5">
+              <b className="text-base text-amber-300">{tourismHubCount}</b>
+              <span className="block text-[10px] text-slate-400 leading-tight mt-0.5">
+                {isAr ? 'أقطاب سياحية صاعدة ≥62' : 'Tourism Hubs ≥62'}
               </span>
             </div>
           </div>
@@ -1096,6 +1153,12 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
               <span>{isAr ? '🚆 النقل والسكك الحديدية:' : '🚆 Transport & Rail:'}</span>
               <b className="text-sky-300">
                 {getTransportScore(selectedWilaya)}/100 · {hasRailAccess(selectedWilaya) ? (isAr ? 'سكة حديدية' : 'Rail') : (isAr ? 'طريق بري' : 'Road')}
+              </b>
+            </div>
+            <div className="flex justify-between">
+              <span>{isAr ? '🏖️ السياحة والتراث (MTA):' : '🏖️ Tourism & Heritage:'}</span>
+              <b className="text-amber-300">
+                {getTourismScore(selectedWilaya)}/100 · {getHotelsCount(selectedWilaya)} 🏨 · {getHeritageSitesCount(selectedWilaya)} 🏛️
               </b>
             </div>
           </div>
@@ -1324,7 +1387,7 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
               className="w-full text-center bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border border-white/20 text-xs px-3 py-2 rounded-lg font-bold shadow transition cursor-pointer flex items-center justify-center gap-2"
             >
               <BarChart3 className="w-3.5 h-3.5 text-emerald-100" />
-              <span>{isAr ? '📋 عرض كل معلومات الولاية (21 مؤشراً)' : '📋 View Full Wilaya Info (21 Indicators)'}</span>
+              <span>{isAr ? '📋 عرض كل معلومات الولاية (24 مؤشراً)' : '📋 View Full Wilaya Info (24 Indicators)'}</span>
             </button>
 
             {onOpenReport && (
@@ -1497,7 +1560,7 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
               <div className="bg-[#0E1B38] border border-white/10 rounded-xl overflow-hidden">
                 <div className="px-4 py-2.5 border-b border-white/10 flex items-center justify-between">
                   <b className="text-sm text-white">
-                    {isAr ? 'جميع المؤشرات الرسمية للولاية (21 مؤشراً + الترتيب الوطني)' : 'Complete Wilaya Indicators (All 21 Metrics & National Ranking)'}
+                    {isAr ? 'جميع المؤشرات الرسمية للولاية (24 مؤشراً + الترتيب الوطني)' : 'Complete Wilaya Indicators (All 24 Metrics & National Ranking)'}
                   </b>
                   <span className="text-[11px] text-slate-400">{isAr ? `نطاق المقارنة: ${wilayas.length} ولاية` : `Benchmarked vs ${wilayas.length} wilayas`}</span>
                 </div>

@@ -8,8 +8,11 @@ import { EarlyWarningAlert, GeoZoneId, ProtocolHorizons, WilayaRecord } from '..
 import {
   getHazardIndex,
   getHealthCoverage,
+  getHeritageSitesCount,
   getHospitalsCount,
+  getHotelsCount,
   getSeismicRisk,
+  getTourismScore,
   getTransportScore,
   getWildfireRisk,
   hasRailAccess
@@ -580,6 +583,63 @@ export function scanNationalEarlyWarnings(
           longTerm: `Connect the wilaya to the SNTF railway expansion network and electrified high-capacity freight corridors.`,
           longTermAr: `ربط الولاية بشبكة السكك الحديدية الوطنية (SNTF) والمحاور اللوجستية عالية السرعة.`
         }
+      });
+    }
+
+    // 9. Tourism, Cultural Heritage & Eco-Hospitality Bottleneck
+    const tScore = getTourismScore(w);
+    const hotelsCnt = getHotelsCount(w);
+    const heritageCnt = getHeritageSitesCount(w);
+    if ((heritageCnt >= 7 || tScore >= 58) && (hotelsCnt < 16 || (!hasRail && trScore < 58) || w.waterDef <= -25)) {
+      const tourismProtocol: ProtocolHorizons =
+        geo.id === 'coastal'
+          ? {
+              shortTerm: `Audit Blue-Flag beach sanitation, regulate seasonal marina shuttles & license ${hotelsCnt} coastal hospitality operators.`,
+              shortTermAr: `تأهيل الشواطئ ذات العلامة الزرقاء وتنظيم النقل البحري الموسمي ومراقبة تصنيف ${hotelsCnt} مؤسسة فندقية ساحلية.`,
+              mediumTerm: `Upgrade coastal ZET (Zones d'Expansion Touristique) with STEP water recycling & heritage Kasbah restoration across ${heritageCnt} sites.`,
+              mediumTermAr: `تهيئة مناطق التوسع السياحي الساحلية (ZET) بمحطات تصفية المياه المستعملة وترميم ${heritageCnt} معلماً وتراثاً ساحلياً.`,
+              longTerm: `Position Mediterranean marinas & thalassotherapy clusters on dedicated coastal rail/tram loops with all-season eco-resorts.`,
+              longTermAr: `ربط المنتجعات البحرية ومراكز المعالجة بمياه البحر بخطوط النقل الساحلي للرفع من السياحة على مدار السنة.`
+            }
+          : geo.id === 'deep_sahara' || geo.id === 'oasis_north'
+          ? {
+              shortTerm: `Deploy solar-powered eco-bivouacs, protect ${heritageCnt} Saharan rock-art/ksar heritage sites & pair tourist convoys with regional air shuttles.`,
+              shortTermAr: `نشر مخيمات بيئية شمسية وحماية ${heritageCnt} موقعاً تراثياً وقصوراً صحراوية وتأمين رحلات ربط جوي جهوي للسياح.`,
+              mediumTerm: `Build classified Saharan eco-lodges using local vernacular earth architecture (expanding ${hotelsCnt} hotels) with closed-loop solar water desalination.`,
+              mediumTermAr: `إنجاز نزل سياحية بيئية مصنفة بالطراز المعماري الصحراوي (توسيع ${hotelsCnt} فندقاً) مزودة بتحلية شمسية مغلقة.`,
+              longTerm: `Establish UNESCO desert cultural corridors (Tassili–Hoggar–M'Zab–Gourara) with zero-carbon e-shuttle loops & craft cooperative hubs.`,
+              longTermAr: `إرساء مسارات التراث العالمي الصحراوي (الطاسيلي–الهقار–مزاب–قورارة) بنقل كهربائي نظيف وأقطاب للصناعة التقليدية.`
+            }
+          : {
+              shortTerm: `Upgrade Roman/Numidian & thermal station signage across ${heritageCnt} sites and subsidize boutique hospitality upgrades (${hotelsCnt} units).`,
+              shortTermAr: `تأهيل المسالك السياحية الرومانية والنوميدية والحموية عبر ${heritageCnt} معلماً ودعم تحديث ${hotelsCnt} وحدة فندقية.`,
+              mediumTerm: `Rehabilitate high-plateaus hydro-thermal resorts, mountain eco-trails & agri-tourism farmsteads linked to SNTF/regional bus loops.`,
+              mediumTermAr: `تحديث المحطات الحموية الجبلية والسهبية ومسارات السياحة الجبلية والفلاحية وربطها بمحطات السكك والنقل الجهوي.`,
+              longTerm: `Develop integrated heritage-thermal-cultural heritage circuits linking High Plateaus & Tell basins to national tourism digital booking.`,
+              longTermAr: `تطوير أقطاب سياحية متكاملة (تراث + سياحة حموية + بيئية) بين التل والهضاب وإدراجها في المنصة الوطنية للحجز السياحي.`
+            };
+
+      alerts.push({
+        id: `ew-tourism-${w.num}`,
+        category: 'tourism',
+        severity: hotelsCnt < 10 && heritageCnt >= 8 ? 'HIGH' : 'MEDIUM',
+        wilayaNum: w.num,
+        wilayaEn: w.en,
+        wilayaAr: w.n,
+        geoZone: geo.id,
+        geoZoneLabel: geo.label,
+        geoZoneLabelAr: geo.labelAr,
+        regionalAssetNote: geo.assetNote,
+        regionalAssetNoteAr: geo.assetNoteAr,
+        metric: lang === 'ar' ? 'فجوة الإيواء وتثمين التراث السياحي' : 'Tourism Hospitality & Heritage Access Gap',
+        currentValue: `${tScore}/100 (${hotelsCnt} 🏨)`,
+        criticalThreshold: '16 hotels / rail+water',
+        detectedAt: now,
+        calculationMethod: 'MTA/ONT Heritage Density × Hotel Bed Capacity × Transit Matrix',
+        uncertaintyMargin: '± 4.5%',
+        suggestedAction: `[Short] ${tourismProtocol.shortTerm} [Medium] ${tourismProtocol.mediumTerm} [Long] ${tourismProtocol.longTerm}`,
+        suggestedActionAr: `[قصير] ${tourismProtocol.shortTermAr} [متوسط] ${tourismProtocol.mediumTermAr} [طويل] ${tourismProtocol.longTermAr}`,
+        protocols: tourismProtocol
       });
     }
   });

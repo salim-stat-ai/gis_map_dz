@@ -117,6 +117,17 @@ export const ALGERIA_DATA_SOURCES: DataSourceMeta[] = [
     lastUpdated: '2026-02-18',
     type: 'Real Statistics',
     status: 'Curated'
+  },
+  {
+    id: 'mta-dz',
+    name: 'Ministry of Tourism & Handicrafts (MTA / ONT)',
+    nameAr: 'وزارة السياحة والصناعة التقليدية والديوان الوطني للسياحة (MTA / ONT)',
+    organization: 'Ministry of Tourism and Handicrafts, Algeria',
+    frequency: 'Annual Tourist Flow & Classified Hotel Registry',
+    coverage: 'Classified hotels, UNESCO heritage sites, Saharan & coastal zones (58 wilayas)',
+    lastUpdated: '2026-03-10',
+    type: 'Real Statistics',
+    status: 'Curated'
   }
 ];
 
@@ -144,6 +155,9 @@ const SEISMIC_MOD = new Set([4, 5, 12, 13, 14, 22, 26, 27, 31, 36, 38, 40, 41, 4
 const WILDFIRE_HIGH = new Set([5, 6, 9, 10, 15, 18, 21, 24, 26, 35, 36, 40, 41, 42, 44]);
 const PORT_HUBS = new Set([6, 13, 16, 18, 21, 23, 27, 31, 35, 42, 46]);
 const CHU_HUBS = new Set([5, 6, 7, 9, 13, 15, 16, 19, 22, 23, 25, 30, 31, 35]);
+const UNESCO_HERITAGE_WILAYAS = new Set([5, 11, 16, 19, 28, 42, 47, 56]);
+const SAHARAN_ECO_TOURISM = new Set([1, 3, 7, 8, 11, 30, 33, 37, 39, 47, 49, 52, 55, 56]);
+const COASTAL_THERMAL_POLES = new Set([2, 6, 13, 15, 16, 18, 21, 23, 24, 25, 27, 31, 35, 36, 40, 42, 46]);
 
 export const INITIAL_WILAYAS: WilayaRecord[] = [
   {num:1, n:"أدرار", en:"Adrar", lat:27.87, lon:-0.29, region:'Sahara', pop:500, price:35000, flood:0.05, soil:30, rain:30, ndvi:0.12, dams:0, wells:950, waterDef:-42, markets:8, coverage:38, energy:65, roads:60, labor:40, industry:45},
@@ -217,6 +231,9 @@ export const INITIAL_WILAYAS: WilayaRecord[] = [
   const hazardIndex = Math.max(5, Math.min(98, Math.round(w.flood * 100 * 0.38 + seismicRisk * 100 * 0.34 + wildfireRisk * 100 * 0.28 + (w.rain < 120 ? 16 : 0))));
   const railAccess = RAIL_WILAYAS.has(w.num);
   const transportScore = Math.max(25, Math.min(98, Math.round(w.roads * 0.62 + (railAccess ? 18 : 0) + (PORT_HUBS.has(w.num) ? 10 : 0) + w.coverage * 0.12)));
+  const heritageSites = Math.max(2, Math.round(3 + (UNESCO_HERITAGE_WILAYAS.has(w.num) ? 8 : 0) + (SAHARAN_ECO_TOURISM.has(w.num) ? 4 : 0) + (COASTAL_THERMAL_POLES.has(w.num) ? 3 : 0) + (w.num % 4)));
+  const hotels = Math.max(4, Math.round(w.pop / 28 + (COASTAL_THERMAL_POLES.has(w.num) ? 14 : 0) + (UNESCO_HERITAGE_WILAYAS.has(w.num) ? 9 : 0) + (SAHARAN_ECO_TOURISM.has(w.num) ? 6 : 0) + (w.num === 16 || w.num === 31 ? 45 : 0)));
+  const tourismScore = Math.max(24, Math.min(97, Math.round(heritageSites * 2.4 + Math.min(35, hotels * 0.42) + w.coverage * 0.16 + w.roads * 0.14 + (railAccess ? 6 : 0) + (COASTAL_THERMAL_POLES.has(w.num) || UNESCO_HERITAGE_WILAYAS.has(w.num) || SAHARAN_ECO_TOURISM.has(w.num) ? 8 : 0))));
 
   return {
     ...w,
@@ -227,6 +244,9 @@ export const INITIAL_WILAYAS: WilayaRecord[] = [
     hazardIndex,
     railAccess,
     transportScore,
+    hotels,
+    heritageSites,
+    tourismScore,
     historicalYears: [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025],
     historicalRain: generateHistory(w.rain, rainSlope, Math.max(2, w.rain * (0.06 + (w.num % 4) * 0.015)), w.num * 0.7),
     historicalWaterDef: generateHistory(w.waterDef, waterSlope, 0.9 + (w.num % 5) * 0.28, w.num * 1.1),

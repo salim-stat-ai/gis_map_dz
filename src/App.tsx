@@ -163,6 +163,12 @@ export default function App() {
               >
                 🚆 {isAr ? 'النقل' : 'Transport'}
               </span>
+              <span
+                onClick={() => { setCurrentSector('tourism'); setActiveTab('map'); }}
+                className={`whitespace-nowrap px-2.5 py-1 rounded-full border cursor-pointer transition font-medium ${currentSector === 'tourism' ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' : 'bg-white/5 text-slate-400 border-white/10 hover:text-white'}`}
+              >
+                🏖️ {isAr ? 'السياحة' : 'Tourism'}
+              </span>
             </div>
           </div>
         </div>

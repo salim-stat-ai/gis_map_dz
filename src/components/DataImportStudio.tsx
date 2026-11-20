@@ -276,7 +276,8 @@ export const DataImportStudio: React.FC<DataImportStudioProps> = ({
       const numericFields = [
         'pop', 'price', 'soil', 'rain', 'ndvi', 'dams', 'wells',
         'waterDef', 'markets', 'coverage', 'energy', 'roads', 'labor', 'industry',
-        'hospitals', 'healthCoverage', 'seismicRisk', 'wildfireRisk', 'hazardIndex', 'transportScore'
+        'hospitals', 'healthCoverage', 'seismicRisk', 'wildfireRisk', 'hazardIndex', 'transportScore',
+        'hotels', 'heritageSites', 'tourismScore'
       ];
 
       numericFields.forEach(k => {
@@ -332,6 +333,9 @@ export const DataImportStudio: React.FC<DataImportStudioProps> = ({
           hazardIndex: patch.hazardIndex,
           transportScore: patch.transportScore,
           railAccess: patch.railAccess,
+          hotels: patch.hotels,
+          heritageSites: patch.heritageSites,
+          tourismScore: patch.tourismScore,
           isCustomImport: true
         };
         currentMap.set(key, newWilaya);
@@ -369,8 +373,8 @@ export const DataImportStudio: React.FC<DataImportStudioProps> = ({
           </h2>
           <p className="text-xs sm:text-sm text-slate-300 mt-1 leading-relaxed">
             {isAr
-              ? `CSV, Excel (.xlsx), TXT, JSON, GeoJSON, KML, Shapefile (.zip) وSQLite (.db) — من ملف أو رابط URL. ربط آلي للحقول (${IMPORT_FIELDS.length} حقلاً شاملة الصحة والأخطار الطبيعية والنقل والسكك).`
-              : `CSV, Excel (.xlsx), TXT, JSON, GeoJSON, KML, zipped Shapefiles (.zip) and SQLite (.db) — from file or URL. Columns auto-map to ${IMPORT_FIELDS.length} indicator fields (including Health, Natural Hazards & Rail/Transport) with full multi-format export.`}
+              ? `CSV, Excel (.xlsx), TXT, JSON, GeoJSON, KML, Shapefile (.zip) وSQLite (.db) — من ملف أو رابط URL. ربط آلي للحقول (${IMPORT_FIELDS.length} حقلاً شاملة الصحة والأخطار الطبيعية والنقل والسياحة والتراث).`
+              : `CSV, Excel (.xlsx), TXT, JSON, GeoJSON, KML, zipped Shapefiles (.zip) and SQLite (.db) — from file or URL. Columns auto-map to ${IMPORT_FIELDS.length} indicator fields (including Health, Natural Hazards, Rail/Transport & Tourism/Heritage) with full multi-format export.`}
           </p>
         </div>
 
@@ -420,6 +424,7 @@ export const DataImportStudio: React.FC<DataImportStudioProps> = ({
               <option value="osm-dams">OSM — dams & reservoirs, Algeria (Overpass)</option>
               <option value="osm-hosp">OSM — hospitals, Algiers (Overpass)</option>
               <option value="osm-rail">OSM — railway stations & SNTF network (Overpass)</option>
+              <option value="osm-tourism">OSM — heritage sites & hotels in Algeria (Overpass)</option>
               <option value="ons-economy">ONS — National Office of Statistics (Wilaya Indicators)</option>
               <option value="anrh-water">ANRH — National Water Agency (Dams & Deficit)</option>
               <option value="worldbank-dz">World Bank — Algeria Indicators API</option>

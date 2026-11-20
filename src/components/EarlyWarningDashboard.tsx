@@ -19,7 +19,8 @@ import {
   Clock,
   HeartPulse,
   Flame,
-  Train
+  Train,
+  Palmtree
 } from 'lucide-react';
 
 interface EarlyWarningDashboardProps {
@@ -168,6 +169,13 @@ export const EarlyWarningDashboard: React.FC<EarlyWarningDashboardProps> = ({
             >
               <Train className="w-3 h-3" />
               <span>{isAr ? 'النقل' : 'Transport'}</span>
+            </button>
+            <button
+              onClick={() => setCategoryFilter('tourism')}
+              className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center gap-1 ${categoryFilter === 'tourism' ? 'bg-yellow-500 text-slate-950' : 'text-slate-400 hover:text-white'}`}
+            >
+              <Palmtree className="w-3 h-3" />
+              <span>{isAr ? 'السياحة والتراث' : 'Tourism'}</span>
             </button>
             <button
               onClick={() => setCategoryFilter('anomaly')}

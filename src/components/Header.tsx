@@ -95,7 +95,7 @@ export const Header: React.FC<HeaderProps> = ({
               onChange={(e) => onSectorChange(e.target.value as SectorKey)}
               className="w-full sm:w-auto bg-[#101D38] text-slate-200 border border-white/15 rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-semibold focus:outline-none focus:border-emerald-500 hover:bg-[#152649] transition cursor-pointer"
             >
-              <option value="all">{isAr ? 'جميع القطاعات الثمانية' : 'All 8 Sectors'}</option>
+              <option value="all">{isAr ? 'جميع القطاعات التسعة' : 'All 9 Sectors'}</option>
               <option value="realestate">{isAr ? '🏠 العقار والسكن' : '🏠 Real Estate'}</option>
               <option value="agri">{isAr ? '🌾 الفلاحة والمحاصيل' : '🌾 Agriculture'}</option>
               <option value="water">{isAr ? '💧 الموارد المائية' : '💧 Water'}</option>
@@ -104,6 +104,7 @@ export const Header: React.FC<HeaderProps> = ({
               <option value="health">{isAr ? '🏥 الصحة والمستشفيات' : '🏥 Health'}</option>
               <option value="hazards">{isAr ? '🌋 الأخطار الطبيعية' : '🌋 Natural Hazards'}</option>
               <option value="transport">{isAr ? '🚆 النقل والسكك الحديدية' : '🚆 Transport'}</option>
+              <option value="tourism">{isAr ? '🏖️ السياحة والتراث' : '🏖️ Tourism & Heritage'}</option>
             </select>
           </div>
 

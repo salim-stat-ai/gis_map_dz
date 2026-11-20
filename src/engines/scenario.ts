@@ -5,7 +5,7 @@
  */
 
 import { ScenarioImpact, ScenarioPathway, WilayaRecord } from '../types';
-import { getHazardIndex, getHealthCoverage, getTransportScore, hasRailAccess } from './reporting';
+import { getHazardIndex, getHealthCoverage, getTourismScore, getTransportScore, hasRailAccess } from './reporting';
 
 export interface ScenarioDriverSettings {
   popGrowthRatePct: number;       // default ~1.6% per year
@@ -17,6 +17,7 @@ export interface ScenarioDriverSettings {
   healthInfraInvestmentPct: number; // 0 to 100 healthcare & hospital capex boost
   hazardMitigationStrictness: number; // 0 to 100 seismic/flood/wildfire prevention
   transportRailExpansionPct: number;  // 0 to 100 SNTF rail & corridor upgrade
+  tourismCapexInvestmentPct: number;  // 0 to 100 hospitality, ZET & heritage tourism capex
 }
 
 export const DEFAULT_SCENARIO_DRIVERS: Record<'optimistic' | 'baseline' | 'pessimistic', ScenarioDriverSettings> = {
@@ -29,7 +30,8 @@ export const DEFAULT_SCENARIO_DRIVERS: Record<'optimistic' | 'baseline' | 'pessi
     urbanZoningStrictness: 85,
     healthInfraInvestmentPct: 85,
     hazardMitigationStrictness: 85,
-    transportRailExpansionPct: 85
+    transportRailExpansionPct: 85,
+    tourismCapexInvestmentPct: 85
   },
   baseline: {
     popGrowthRatePct: 1.6,
@@ -40,7 +42,8 @@ export const DEFAULT_SCENARIO_DRIVERS: Record<'optimistic' | 'baseline' | 'pessi
     urbanZoningStrictness: 50,
     healthInfraInvestmentPct: 45,
     hazardMitigationStrictness: 50,
-    transportRailExpansionPct: 45
+    transportRailExpansionPct: 45,
+    tourismCapexInvestmentPct: 45
   },
   pessimistic: {
     popGrowthRatePct: 2.1,
@@ -51,7 +54,8 @@ export const DEFAULT_SCENARIO_DRIVERS: Record<'optimistic' | 'baseline' | 'pessi
     urbanZoningStrictness: 25,
     healthInfraInvestmentPct: 20,
     hazardMitigationStrictness: 20,
-    transportRailExpansionPct: 15
+    transportRailExpansionPct: 15,
+    tourismCapexInvestmentPct: 18
   }
 };
 
@@ -64,6 +68,7 @@ export function simulateWilayaScenario(
   const baseHealth = getHealthCoverage(w);
   const baseHazard = getHazardIndex(w);
   const baseTransport = getTransportScore(w);
+  const baseTourism = getTourismScore(w);
   const railLinked = hasRailAccess(w);
 
   years.forEach(yr => {
@@ -123,6 +128,12 @@ export function simulateWilayaScenario(
     const transportIndBoost = (transportConnectivityScore - baseTransport) * 0.35;
     const industryCapacity = Math.max(30, Math.min(160, Math.round(w.industry * 1.1 + horizon * 1.4 - indWaterPenalty + transportIndBoost)));
 
+    // Tourism & Heritage Attractiveness Index (/100)
+    const tourismCapexBoost = ((drivers.tourismCapexInvestmentPct - 35) / 100) * 24 * progress;
+    const tourismSynergy = (transportConnectivityScore - baseTransport) * 0.3 + (healthCoveragePct - baseHealth) * 0.15;
+    const tourismRiskPenalty = Math.max(0, hazardRiskScore - 60) * 0.12 + Math.max(0, -projectedDeficit - 25) * 0.15;
+    const tourismAttractivenessIndex = Math.max(18, Math.min(99, Math.round(baseTourism + tourismCapexBoost + tourismSynergy - tourismRiskPenalty)));
+
     impacts[yr] = {
       year: yr,
       waterDeficit: projectedDeficit,
@@ -132,7 +143,8 @@ export function simulateWilayaScenario(
       industrialCapacityIndex: industryCapacity,
       healthCoveragePct,
       hazardRiskScore,
-      transportConnectivityScore
+      transportConnectivityScore,
+      tourismAttractivenessIndex
     };
   });
 
@@ -161,21 +173,23 @@ export function generateAllPathways(
   const pathways: ScenarioPathway[] = [
     {
       id: 'optimistic',
-      name: 'Optimistic Scenario (Green Acceleration, Health & Rail Modernization)',
-      nameAr: 'السيناريو المتفائل (الاستدامة المائية، التغطية الصحية وربط السكك)',
-      description: 'Rapid desalination & drip irrigation (85%), universal hospital/CHU access, strict seismic & wildfire mitigation, and SNTF high-capacity rail corridors.',
-      descriptionAr: 'دخول محطات التحلية والسقي الموضعي (85%)، تعميم الأقطاب الاستشفائية، تعزيز الوقاية الزلزالية والحرائق، وتوسيع خطوط السكك الحديدية.',
+      name: 'Optimistic Scenario (Green Acceleration, Health, Rail & Tourism Modernization)',
+      nameAr: 'السيناريو المتفائل (الاستدامة المائية، الصحة، السكك والسياحة المستدامة)',
+      description: 'Rapid desalination & drip irrigation (85%), universal hospital/CHU access, strict seismic & wildfire mitigation, SNTF high-capacity rail corridors, and classified eco-heritage tourism poles.',
+      descriptionAr: 'دخول محطات التحلية والسقي الموضعي (85%)، تعميم الأقطاب الاستشفائية، الوقاية الزلزالية والحرائق، توسيع السكك الحديدية، وتطوير الأقطاب السياحية والتراثية المصنفة.',
       assumptions: [
         `Desalination capacity expands +${optDrivers.desalinationCapexMillionM3}M m³/yr & drip irrigation reaches ${optDrivers.irrigationEfficiencyPct}%`,
         `Hospital & CHU modernization capex reaches ${optDrivers.healthInfraInvestmentPct}/100`,
         `Seismic, flood & wildfire mitigation reaches ${optDrivers.hazardMitigationStrictness}/100 enforcement`,
-        `SNTF national rail & highway corridor investment reaches ${optDrivers.transportRailExpansionPct}/100`
+        `SNTF national rail & highway corridor investment reaches ${optDrivers.transportRailExpansionPct}/100`,
+        `Tourism ZET, classified hotels & heritage eco-circuits investment reaches ${optDrivers.tourismCapexInvestmentPct}/100`
       ],
       assumptionsAr: [
         `توسيع التحلية (+${optDrivers.desalinationCapexMillionM3} مليون م³) وبلوغ السقي الموضعي ${optDrivers.irrigationEfficiencyPct}%`,
         `رفع الاستثمار الصحي والمستشفيات إلى مستوى ${optDrivers.healthInfraInvestmentPct}/100 لتغطية النمو السكاني`,
         `تفعيل حزام الوقاية من الأخطار الطبيعية والزلازل والحرائق بصرامة ${optDrivers.hazardMitigationStrictness}/100`,
-        `توسيع شبكة السكك الحديدية والنقل متعدد الوسائط إلى مؤشر ${optDrivers.transportRailExpansionPct}/100`
+        `توسيع شبكة السكك الحديدية والنقل متعدد الوسائط إلى مؤشر ${optDrivers.transportRailExpansionPct}/100`,
+        `الاستثمار السياحي والفندقي وتثمين المواقع التراثية بمؤشر ${optDrivers.tourismCapexInvestmentPct}/100`
       ],
       impacts: simulateWilayaScenario(w, optDrivers)
     },
@@ -183,19 +197,21 @@ export function generateAllPathways(
       id: 'baseline',
       name: 'Baseline Scenario (Organic Continuity / Status Quo)',
       nameAr: 'السيناريو المرجعي (استمرار الاتجاهات الحالية)',
-      description: 'Moderate progress on hydraulic transfers, hospitals, hazard zoning, and transport corridors alongside standard demographic growth.',
-      descriptionAr: 'استمرار وتيرة المشاريع الحالية في المياه والصحة والنقل دون طفرات هيكلية، مع نمو ديمغرافي منتظم وتراجع مطري تدريجي.',
+      description: 'Moderate progress on hydraulic transfers, hospitals, hazard zoning, transport corridors, and heritage tourism alongside standard demographic growth.',
+      descriptionAr: 'استمرار وتيرة المشاريع الحالية في المياه والصحة والنقل والسياحة دون طفرات هيكلية، مع نمو ديمغرافي منتظم وتراجع مطري تدريجي.',
       assumptions: [
         `Hydraulic investments (+${baseDrivers.desalinationCapexMillionM3}M m³) & rainfall drift (${baseRainSign}/yr)`,
         `Health infrastructure investment pace at ${baseDrivers.healthInfraInvestmentPct}/100`,
         `Natural hazard preparedness & zoning strictness at ${baseDrivers.hazardMitigationStrictness}/100`,
-        `Rail & multimodal logistics rollout pace at ${baseDrivers.transportRailExpansionPct}/100`
+        `Rail & multimodal logistics rollout pace at ${baseDrivers.transportRailExpansionPct}/100`,
+        `Tourism hospitality & ZET upgrade pace at ${baseDrivers.tourismCapexInvestmentPct}/100`
       ],
       assumptionsAr: [
         `تنفيذ التحويلات (+${baseDrivers.desalinationCapexMillionM3} مليون م³) مع تغيّر التساقط (${baseRainSign}/سنة)`,
         `وتيرة إنجاز المرافق الصحية والاستشفائية عند مستوى ${baseDrivers.healthInfraInvestmentPct}/100`,
         `جاهزية الوقاية من الأخطار الطبيعية عند ${baseDrivers.hazardMitigationStrictness}/100 وصرامة التعمير ${baseDrivers.urbanZoningStrictness}/100`,
-        `تقدم مشاريع النقل والربط بالسكك الحديدية بمعدل ${baseDrivers.transportRailExpansionPct}/100`
+        `تقدم مشاريع النقل والربط بالسكك الحديدية بمعدل ${baseDrivers.transportRailExpansionPct}/100`,
+        `وتيرة مشاريع التهيئة السياحية والفندقية عند مستوى ${baseDrivers.tourismCapexInvestmentPct}/100`
       ],
       impacts: simulateWilayaScenario(w, baseDrivers)
     },
@@ -203,19 +219,21 @@ export function generateAllPathways(
       id: 'pessimistic',
       name: 'Pessimistic Scenario (Severe Climate Stress & Infrastructure Strain)',
       nameAr: 'السيناريو المتشائم (تفاقم الإجهاد المناخي والضغط على الخدمات)',
-      description: 'Consecutive droughts, stalled hospital & rail capex, heightened wildfire/flood risk, and unmanaged urban sprawl into hazard zones.',
-      descriptionAr: 'موجات جفاف وحرائق غابات، تباطؤ مشاريع الصحة والسكك الحديدية، وارتفاع كلفة التوسع العمراني في النطاقات الخطرة.',
+      description: 'Consecutive droughts, stalled hospital, rail & tourism hospitality capex, heightened wildfire/flood risk, and unmanaged urban sprawl into hazard zones.',
+      descriptionAr: 'موجات جفاف وحرائق غابات، تباطؤ مشاريع الصحة والسكك الحديدية والسياحة، وارتفاع كلفة التوسع العمراني في النطاقات الخطرة.',
       assumptions: [
         `Severe drying (${pessDrivers.climateRainChangePct}%/yr) & unmetered groundwater extraction`,
         `Hospital capacity lags rapid demographic growth (+${pessDrivers.popGrowthRatePct}%/yr)`,
         'Delayed seismic/wildfire prevention & peri-urban sprawl in flood beds',
-        'Freight & regional rail bottlenecks constrain interior industrial growth'
+        'Freight & regional rail bottlenecks constrain interior industrial & hospitality growth',
+        'Under-invested hotel bed capacity & climate-stressed heritage/coastal ecosystems'
       ],
       assumptionsAr: [
         `موجات جفاف حادة (${pessDrivers.climateRainChangePct}% سنوياً) وضخ جوفي عشوائي`,
         `تأخر توسيع الهياكل الصحية عن وتيرة النمو السكاني (+${pessDrivers.popGrowthRatePct}% سنوياً)`,
         'ضعف الوقاية من حرائق الغابات والفيضانات والبناء العشوائي في مناطق الخطر',
-        'تباطؤ ربط السكك الحديدية والنقل اللوجستي بما يعيق الأقطاب الداخلية'
+        'تباطؤ ربط السكك الحديدية والنقل اللوجستي بما يعيق الأقطاب الداخلية والسياحية',
+        'تراجع جاهزية الإيواء الفندقي وتأثر المواقع التراثية والسياحية بالإجهاد المناخي والحرائق'
       ],
       impacts: simulateWilayaScenario(w, pessDrivers)
     }

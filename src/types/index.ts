@@ -13,7 +13,8 @@ export type SectorKey =
   | 'industry'
   | 'health'
   | 'hazards'
-  | 'transport';
+  | 'transport'
+  | 'tourism';
 
 export interface WilayaRecord {
   num: number;
@@ -45,6 +46,9 @@ export interface WilayaRecord {
   hazardIndex?: number;    // composite natural hazard exposure 0 - 100
   transportScore?: number; // multimodal roads + rail + hub score 0 - 100
   railAccess?: boolean;    // connected to SNTF national railway network
+  hotels?: number;         // classified hotels, tourist residences & eco-lodges
+  heritageSites?: number;  // UNESCO, Roman, Ottoman, Ksars & cultural heritage sites
+  tourismScore?: number;   // composite tourism & heritage attractiveness 0 - 100
   // Historical data for time series analysis (2018-2025)
   historicalYears?: number[];
   historicalRain?: number[];
@@ -155,6 +159,7 @@ export interface ScenarioImpact {
   healthCoveragePct: number;
   hazardRiskScore: number;
   transportConnectivityScore: number;
+  tourismAttractivenessIndex: number;
 }
 
 export interface ScenarioPathway {
@@ -243,7 +248,7 @@ export interface ProtocolHorizons {
 
 export interface EarlyWarningAlert {
   id: string;
-  category: 'water' | 'drought' | 'flood' | 'commerce' | 'industry' | 'health' | 'hazards' | 'transport' | 'anomaly';
+  category: 'water' | 'drought' | 'flood' | 'commerce' | 'industry' | 'health' | 'hazards' | 'transport' | 'tourism' | 'anomaly';
   severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
   wilayaNum: number;
   wilayaEn: string;

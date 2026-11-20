@@ -5,7 +5,16 @@
  */
 
 import { AhpCriterion, AhpEvaluationResult, HotspotRecord, MoranResult, WilayaRecord } from '../types';
-import { getHazardIndex, getHealthCoverage, getSeismicRisk, getTransportScore, getWildfireRisk } from './reporting';
+import {
+  getHazardIndex,
+  getHealthCoverage,
+  getHeritageSitesCount,
+  getHotelsCount,
+  getSeismicRisk,
+  getTourismScore,
+  getTransportScore,
+  getWildfireRisk
+} from './reporting';
 
 // Distance calculation between geographical coordinates in kilometers (Haversine formula)
 export function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -272,9 +281,9 @@ export function evaluateAhpSuitability(
     weight: c.weight / totalWeight
   }));
 
-  const RI_TABLE: Record<number, number> = { 1: 0, 2: 0, 3: 0.58, 4: 0.90, 5: 1.12, 6: 1.24, 7: 1.32, 8: 1.41, 9: 1.45, 10: 1.49 };
+  const RI_TABLE: Record<number, number> = { 1: 0, 2: 0, 3: 0.58, 4: 0.90, 5: 1.12, 6: 1.24, 7: 1.32, 8: 1.41, 9: 1.45, 10: 1.49, 11: 1.51 };
   const nCriteria = normalizedCriteria.length;
-  const RI = RI_TABLE[nCriteria] || 1.49;
+  const RI = RI_TABLE[nCriteria] || 1.51;
 
   // Dynamic consistency estimation based on weight dispersion (max/min ratio alignment)
   const weights = normalizedCriteria.map(c => c.weight);
@@ -301,6 +310,7 @@ export function evaluateAhpSuitability(
       else if (crit.id === 'health') normVal = getHealthCoverage(w) / 100;
       else if (crit.id === 'hazardSafety') normVal = 1 - Math.min(1, getHazardIndex(w) / 100);
       else if (crit.id === 'transport') normVal = getTransportScore(w) / 100;
+      else if (crit.id === 'tourism') normVal = getTourismScore(w) / 100;
       const contrib = normVal * crit.weight * 100;
       contribs[crit.id] = Math.round(contrib * 10) / 10;
       compositeScore += normVal * crit.weight;
@@ -524,7 +534,7 @@ function invertMatrix(M: number[][]): number[][] | null {
 
 export function computeSpatialRegression(
   wilayas: WilayaRecord[],
-  depVarName: 'waterDef' | 'price' | 'industry' | 'coverage' | 'healthCoverage' | 'hazardIndex' | 'transportScore' = 'waterDef'
+  depVarName: 'waterDef' | 'price' | 'industry' | 'coverage' | 'healthCoverage' | 'hazardIndex' | 'transportScore' | 'tourismScore' = 'waterDef'
 ): {
   modelType: 'Spatial Lag (SAR)';
   rho: number;
@@ -543,6 +553,7 @@ export function computeSpatialRegression(
     if (depVarName === 'healthCoverage') return getHealthCoverage(w);
     if (depVarName === 'hazardIndex') return getHazardIndex(w);
     if (depVarName === 'transportScore') return getTransportScore(w);
+    if (depVarName === 'tourismScore') return getTourismScore(w);
     return w.waterDef;
   };
 
@@ -604,6 +615,13 @@ export function computeSpatialRegression(
           { label: 'Road Connectivity (%)', labelAr: 'شبكة الطرق السريعة (%)', extract: w => w.roads },
           { label: 'Industrial Base (/100)', labelAr: 'الجاذبية الصناعية (/100)', extract: w => w.industry },
           { label: 'Energy Grid (%)', labelAr: 'شبكة الطاقة (%)', extract: w => w.energy }
+        ]
+      : depVarName === 'tourismScore'
+      ? [
+          { label: 'Spatial Lag (ρ·W·Tourism)', labelAr: 'التكتل المكاني للسياحة (ρ·W·Y)', extract: (_w, i) => WY[i] },
+          { label: 'Heritage Sites', labelAr: 'المواقع التراثية المصنفة', extract: w => getHeritageSitesCount(w) },
+          { label: 'Classified Hotels', labelAr: 'عدد الفنادق المصنفة', extract: w => getHotelsCount(w) },
+          { label: 'Transport & Rail (/100)', labelAr: 'الربط والنقل (/100)', extract: w => getTransportScore(w) }
         ]
       : [
           { label: 'Spatial Lag (ρ·W·Y)', labelAr: 'الفجوة المكانية للمياه (ρ·W·Y)', extract: (_w, i) => WY[i] },

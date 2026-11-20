@@ -14,7 +14,10 @@ import {
   getWildfireRisk,
   getHazardIndex,
   getTransportScore,
-  hasRailAccess
+  hasRailAccess,
+  getHotelsCount,
+  getHeritageSitesCount,
+  getTourismScore
 } from './reporting';
 
 export const AI_AGENT_PROFILES: AgentProfile[] = [
@@ -167,6 +170,9 @@ function rankWilayaPressuresAndStrengths(w: WilayaRecord, floodPct: number, drou
   const hazardIdx = getHazardIndex(w);
   const transportSc = getTransportScore(w);
   const hasRail = hasRailAccess(w);
+  const hotelsCnt = getHotelsCount(w);
+  const heritageCnt = getHeritageSitesCount(w);
+  const tourismSc = getTourismScore(w);
 
   const pressures: FactorEntry[] = [
     {
@@ -216,6 +222,12 @@ function rankWilayaPressuresAndStrengths(w: WilayaRecord, floodPct: number, drou
       score: (100 - transportSc) * 1.55 + (hasRail ? 0 : 12),
       labelEn: `transport & rail lag (${transportSc}/100${hasRail ? '' : ', no SNTF rail'})`,
       labelAr: `محدودية النقل والسكك (${transportSc}/100${hasRail ? '' : '، بدون خط سكك SNTF'})`
+    },
+    {
+      id: 'tourism_gap',
+      score: (100 - tourismSc) * 1.1 + (hotelsCnt < 12 ? 10 : 0),
+      labelEn: `hospitality & tourism under-capacity (${tourismSc}/100, ${hotelsCnt} hotels)`,
+      labelAr: `ضعف الطاقة الفندقية والسياحية (${tourismSc}/100 بـ ${hotelsCnt} فندقاً)`
     }
   ].sort((a, b) => b.score - a.score);
 
@@ -261,6 +273,12 @@ function rankWilayaPressuresAndStrengths(w: WilayaRecord, floodPct: number, drou
       score: w.labor * 1.15,
       labelEn: `active workforce depth (${w.labor}/100)`,
       labelAr: `توفر اليد العاملة (${w.labor}/100)`
+    },
+    {
+      id: 'tourism',
+      score: tourismSc * 1.2 + heritageCnt * 1.5,
+      labelEn: `tourism & heritage assets (${tourismSc}/100, ${heritageCnt} sites, ${hotelsCnt} hotels)`,
+      labelAr: `الأصول السياحية والتراثية (${tourismSc}/100، ${heritageCnt} معلماً، ${hotelsCnt} فندقاً)`
     }
   ].sort((a, b) => b.score - a.score);
 
@@ -295,6 +313,9 @@ export function runAgentAnalysis(
   const hazardIdx = getHazardIndex(w);
   const transportSc = getTransportScore(w);
   const railConnected = hasRailAccess(w);
+  const hotelsCnt = getHotelsCount(w);
+  const heritageCnt = getHeritageSitesCount(w);
+  const tourismSc = getTourismScore(w);
   const industryScore = Math.round(w.energy * 0.28 + transportSc * 0.32 + w.labor * 0.2 + (100 - Math.abs(w.waterDef)) * 0.2);
 
   // Historical 2018-2025 real deltas
@@ -332,6 +353,7 @@ export function runAgentAnalysis(
   const healthRank = getRank(allWilayas, w, x => getHealthCoverage(x), true);
   const hazardRank = getRank(allWilayas, w, x => getHazardIndex(x), true);
   const transportRank = getRank(allWilayas, w, x => getTransportScore(x), true);
+  const tourismRank = getRank(allWilayas, w, x => getTourismScore(x), true);
 
   // Composite Risk Score & Rating (expanded with Health & Hazards & Rail isolation)
   let riskScore = 0;
@@ -379,7 +401,7 @@ export function runAgentAnalysis(
           'مؤشر Gi* المحلي': localGiZ,
           'النقل والسكك': `${transportSc}/100 (${railConnected ? 'SNTF' : 'طرقي'})`,
           'التغطية الصحية': `${healthCov}% (#${healthRank})`,
-          'أقرب ولاية': `${neighborName} (${distKm}كم)`,
+          'السياحة والتراث': `${tourismSc}/100 (#${tourismRank})`,
           'الأخطار المركبة': `${hazardIdx}/100 (#${hazardRank})`,
           'أقوى قطب جذب': `${gravityName} (${topGravity?.interactionStrength ?? 0})`
         }
@@ -387,18 +409,18 @@ export function runAgentAnalysis(
           'Local Gi* Z': localGiZ,
           'Transport & Rail': `${transportSc}/100 (${railConnected ? 'SNTF' : 'Road'})`,
           'Health Coverage': `${healthCov}% (#${healthRank})`,
-          'Nearest Peer': `${neighborName} (${distKm} km)`,
+          'Tourism & Heritage': `${tourismSc}/100 (#${tourismRank})`,
           'Natural Hazards': `${hazardIdx}/100 (#${hazardRank})`,
           'Gravity Pole': `${gravityName} (${topGravity?.interactionStrength ?? 0})`
         };
 
     mathematicalFindings = isAr ? [
       `الارتباط المكاني المحلي لـ ${wName} (Getis-Ord Gi*): Z = ${localGiZ} (${localGiClass}) مقابل موران الوطني I = ${moran.observedI} (p = ${moran.pValue})؛ فارق الجوار المائي ${waterLagDelta >= 0 ? '+' : ''}${waterLagDelta}`,
-      `الربط متعدد الوسائط والنفاذ الصحي: مؤشر النقل ${transportSc}/100 (الرتبة #${transportRank}/${nTotal}، السكة الحديدية: ${railConnected ? 'متصلة بشبكة SNTF' : 'غير متصلة'}) والتغطية الصحية ${healthCov}% (${hospitalsCnt} مستشفى)`,
+      `الربط متعدد الوسائط والنفاذ الصحي والسياحي: النقل ${transportSc}/100 (#${transportRank}/${nTotal}، ${railConnected ? 'SNTF' : 'طرقي'})، الصحة ${healthCov}% (${hospitalsCnt} مستشفى)، والسياحة ${tourismSc}/100 (${heritageCnt} معلماً، ${hotelsCnt} فندقاً)`,
       `طيف الأخطار المركب (${hazardIdx}/100 — #${hazardRank}/${nTotal}): زلازل ${seismicPct}%، فيضانات ${floodPct}%، وحرائق غابات ${wildfirePct}% في النطاق (${ecoZone.label})`
     ] : [
       `Spatial Autocorrelation for ${wName}: Local Gi* Z = ${localGiZ} (${localGiClass}) against National Moran's I = ${moran.observedI} (p = ${moran.pValue}); water lag ${waterLagDelta >= 0 ? '+' : ''}${waterLagDelta}`,
-      `Multimodal Connectivity & Access: Transport score ${transportSc}/100 (rank #${transportRank}/${nTotal}, SNTF rail: ${railConnected ? 'Connected' : 'Road-only'}) and Healthcare coverage ${healthCov}% (${hospitalsCnt} hospitals)`,
+      `Connectivity, Health & Tourism Topology: Transport ${transportSc}/100 (#${transportRank}/${nTotal}, ${railConnected ? 'SNTF rail' : 'Road'}), Health ${healthCov}% (${hospitalsCnt} hospitals), Tourism ${tourismSc}/100 (${heritageCnt} sites, ${hotelsCnt} hotels)`,
       `Multi-Hazard Spectrum (${hazardIdx}/100 · rank #${hazardRank}/${nTotal}): Seismic ${seismicPct}%, Flood ${floodPct}%, Wildfire ${wildfirePct}% across (${ecoZone.label})`
     ];
 
@@ -584,28 +606,28 @@ export function runAgentAnalysis(
     calculations = isAr
       ? {
           'الجاهزية الصناعية': `${industryScore}/100 (#${industryRank})`,
+          'الجاذبية السياحية': `${tourismSc}/100 (#${tourismRank})`,
           'مرونة الطلب المائي': `+${popElasticityImpact}`,
           'متوسط البنية التحتية': `${infraComposite}/100`,
-          'فجوة التغطية %': `${coverageGapPct}%`,
           'ثقل العائق الأول': `${bottleneckGap} نقطة`,
           'عائد فك الاختناق': `+${marginalRoi}%`
         }
       : {
           'Industry Rank': `${industryScore}/100 (#${industryRank})`,
+          'Tourism Index': `${tourismSc}/100 (#${tourismRank})`,
           'Water Elasticity': `+${popElasticityImpact}`,
           'Infra Mean': `${infraComposite}/100`,
-          'Coverage Lag': `${coverageGapPct}%`,
           'Bottleneck Weight': `${bottleneckGap} pts`,
           'Unlock ROI': `+${marginalRoi}%`
         };
 
     mathematicalFindings = isAr ? [
       `نموذج الانحدار المتعدد لـ ${wName}: معامل التحديد R² = ${multiReg.metrics.r2} (RMSE = ${multiReg.metrics.rmse})، ومعامل المرونة الديموغرافية المائية = +${popElasticityImpact} وحدة طلب إضافية`,
-      `تفكيك العوامل الصناعية في ${wName} (${industryScore}/100، المرتبة #${industryRank}/${nTotal}): الطاقة ${w.energy}%، الطرق ${w.roads}%، اليد العاملة ${w.labor}% (المتوسط التركيبي ${infraComposite}/100)`,
+      `تفكيك العوامل الصناعية والسياحية في ${wName}: الصناعة ${industryScore}/100 (#${industryRank}/${nTotal})، السياحة والضيافة ${tourismSc}/100 (#${tourismRank}/${nTotal} عبر ${hotelsCnt} فندقاً و${heritageCnt} معلماً) ضمن بنية ${infraComposite}/100`,
       `التحليل التجاري القياسي: ${w.markets} سوقاً تغطي ${w.coverage}% (${gapVsNatCov >= 0 ? '+' : ''}${gapVsNatCov}% مقارنة بالمتوسط الوطني ${avgCoverage}%)، مع نمو سعري تاريخي +${priceDelta8y.toLocaleString()} دج/م²`
     ] : [
       `Multiple OLS Fit (${wName}): R² = ${multiReg.metrics.r2} (RMSE = ${multiReg.metrics.rmse}) with demographic water-demand elasticity contributing +${popElasticityImpact} load units`,
-      `Industrial Factor Matrix (${industryScore}/100, rank #${industryRank}/${nTotal}): Energy ${w.energy}%, Roads ${w.roads}%, Workforce ${w.labor}% (composite mean ${infraComposite}/100)`,
+      `Industrial & Tourism Diversification (${wName}): Industry ${industryScore}/100 (#${industryRank}/${nTotal}), Tourism & Hospitality ${tourismSc}/100 (#${tourismRank}/${nTotal}: ${hotelsCnt} hotels, ${heritageCnt} heritage sites)`,
       `Commercial Market Elasticity: ${w.markets} hubs yield ${w.coverage}% coverage (${gapVsNatCov >= 0 ? '+' : ''}${gapVsNatCov}% vs national ${avgCoverage}%) amidst +${priceDelta8y.toLocaleString()} DZD/m² 8-yr appreciation`
     ];
 
@@ -679,18 +701,20 @@ export function runAgentAnalysis(
       `Condition ${wName}'s municipal capital grants on preventative risk compliance (${cbaMultiple}x fiscal CBA benchmark)`
     ];
   } else {
-    // 7. GROK 2: Multivariate Z-Score Outlier Radar & Statistical Divergence (across 8 sectors)
+    // 7. GROK 2: Multivariate Z-Score Outlier Radar & Statistical Divergence (across 9 sectors)
     const priceArr = allWilayas.map(x => x.price);
     const waterArr = allWilayas.map(x => x.waterDef);
     const healthArr = allWilayas.map(x => getHealthCoverage(x));
     const hazArr = allWilayas.map(x => getHazardIndex(x));
     const transArr = allWilayas.map(x => getTransportScore(x));
+    const tourArr = allWilayas.map(x => getTourismScore(x));
 
     const zPrice = Math.round(((w.price - meanOf(priceArr)) / stdOf(priceArr, meanOf(priceArr))) * 100) / 100;
     const zWater = Math.round(((w.waterDef - meanOf(waterArr)) / stdOf(waterArr, meanOf(waterArr))) * 100) / 100;
     const zHealth = Math.round(((healthCov - meanOf(healthArr)) / stdOf(healthArr, meanOf(healthArr))) * 100) / 100;
     const zHazard = Math.round(((hazardIdx - meanOf(hazArr)) / stdOf(hazArr, meanOf(hazArr))) * 100) / 100;
     const zTrans = Math.round(((transportSc - meanOf(transArr)) / stdOf(transArr, meanOf(transArr))) * 100) / 100;
+    const zTourism = Math.round(((tourismSc - meanOf(tourArr)) / stdOf(tourArr, meanOf(tourArr))) * 100) / 100;
 
     const anomalies: string[] = [];
     if (w.price > 95000 && (w.flood >= 0.28 || hazardIdx >= 55)) {
@@ -708,18 +732,23 @@ export function runAgentAnalysis(
         ? `انقطاع لوجستي في ${wName}: نسيج صناعي نشط (${w.industry}/100) دون ربط بالسكك الحديدية SNTF`
         : `Rail-Industry Disconnect in ${wName}: active industrial base (${w.industry}/100) lacking SNTF rail link`);
     }
+    if (heritageCnt >= 7 && (hotelsCnt < 20 || transportSc < 55)) {
+      anomalies.push(isAr
+        ? `مفارقة تراث/إيواء في ${wName}: ${heritageCnt} معالم مصنفة تقابلها طاقة فندقية محدودة (${hotelsCnt} فندقاً) ونقل ${transportSc}/100`
+        : `Heritage-Hospitality Paradox in ${wName}: ${heritageCnt} heritage sites constrained by ${hotelsCnt} hotels and ${transportSc}/100 transit`);
+    }
     if (w.waterDef <= -24 && w.wells >= 650) {
       anomalies.push(isAr
         ? `استنزاف جوفي حاد في ${wName}: عجز ${w.waterDef} مع تركز ${w.wells} بئر`
         : `Borehole Overdraft Signal in ${wName}: ${w.waterDef} deficit paired with ${w.wells} deep wells`);
     }
-    if (Math.abs(zPrice) >= 1.5 || Math.abs(zHazard) >= 1.5 || Math.abs(zHealth) >= 1.5 || Math.abs(zTrans) >= 1.5) {
+    if (Math.abs(zPrice) >= 1.5 || Math.abs(zHazard) >= 1.5 || Math.abs(zHealth) >= 1.5 || Math.abs(zTrans) >= 1.5 || Math.abs(zTourism) >= 1.5) {
       anomalies.push(isAr
-        ? `ذيل إحصائي متطرف في ${wName}: Z(صحة)=${zHealth}، Z(أخطار)=${zHazard}، Z(نقل)=${zTrans}`
-        : `Extreme Z-Tail in ${wName}: Z(Health)=${zHealth}, Z(Hazards)=${zHazard}, Z(Transport)=${zTrans}`);
+        ? `ذيل إحصائي متطرف في ${wName}: Z(صحة)=${zHealth}، Z(أخطار)=${zHazard}، Z(نقل)=${zTrans}، Z(سياحة)=${zTourism}`
+        : `Extreme Z-Tail in ${wName}: Z(Health)=${zHealth}, Z(Hazards)=${zHazard}, Z(Transport)=${zTrans}, Z(Tourism)=${zTourism}`);
     }
 
-    const maxAbsZ = Math.max(Math.abs(zPrice), Math.abs(zWater), Math.abs(zHealth), Math.abs(zHazard), Math.abs(zTrans));
+    const maxAbsZ = Math.max(Math.abs(zPrice), Math.abs(zWater), Math.abs(zHealth), Math.abs(zHazard), Math.abs(zTrans), Math.abs(zTourism));
 
     calculations = isAr
       ? {
@@ -727,7 +756,7 @@ export function runAgentAnalysis(
           'Z(المياه)': zWater,
           'Z(الصحة)': zHealth,
           'Z(الأخطار)': zHazard,
-          'Z(النقل)': zTrans,
+          'Z(السياحة)': zTourism,
           'إشارات الشذوذ': anomalies.length
         }
       : {
@@ -735,38 +764,38 @@ export function runAgentAnalysis(
           'Z(Water)': zWater,
           'Z(Health)': zHealth,
           'Z(Hazards)': zHazard,
-          'Z(Transport)': zTrans,
+          'Z(Tourism)': zTourism,
           'Anomalies': anomalies.length
         };
 
     mathematicalFindings = isAr ? [
-      `رادار التباين متعدد المتغيرات لـ ${wName}: رُصدت ${anomalies.length} شذوذات عبر الطبقات الثماني (أقصى انحراف = ${maxAbsZ.toFixed(2)}σ)`,
+      `رادار التباين متعدد المتغيرات لـ ${wName}: رُصدت ${anomalies.length} شذوذات عبر الطبقات التسع (أقصى انحراف = ${maxAbsZ.toFixed(2)}σ)`,
       anomalies[0] || `تتبع ${wName} توزيعاً مستقراً نسبياً (أقصى Z = ${maxAbsZ.toFixed(2)}σ) مقارنة بالمتوسط الوطني (${avgWaterDef} عجز، ${avgPrice.toLocaleString()} دج/م²)`,
-      `بصمة التطرف في ${wName}: Z(صحة)=${zHealth}، Z(أخطار)=${zHazard}، Z(نقل)=${zTrans}، Z(مياه)=${zWater} مقابل جارتها ${neighborName}`
+      `بصمة التطرف في ${wName}: Z(صحة)=${zHealth}، Z(أخطار)=${zHazard}، Z(نقل)=${zTrans}، Z(سياحة)=${zTourism} مقابل جارتها ${neighborName}`
     ] : [
-      `8-Layer Multivariate Z-Radar for ${wName}: Flagged ${anomalies.length} statistical anomalies (peak deviation = ${maxAbsZ.toFixed(2)}σ)`,
+      `9-Layer Multivariate Z-Radar for ${wName}: Flagged ${anomalies.length} statistical anomalies (peak deviation = ${maxAbsZ.toFixed(2)}σ)`,
       anomalies[0] || `${wName} tracks within normal dispersion (max |Z| = ${maxAbsZ.toFixed(2)}σ vs national ${avgPrice.toLocaleString()} DZD/m² & ${avgWaterDef} water balance)`,
-      `Dispersion Signature (${wName} vs ${neighborName}): Z(Health)=${zHealth}, Z(Hazards)=${zHazard}, Z(Transport)=${zTrans}, Z(Water)=${zWater}`
+      `Dispersion Signature (${wName} vs ${neighborName}): Z(Health)=${zHealth}, Z(Hazards)=${zHazard}, Z(Transport)=${zTrans}, Z(Tourism)=${zTourism}`
     ];
 
     spatialDiagnosis = isAr
       ? (anomalies.length > 0
           ? `رادار Grok يرصد في ${wName} انحرافاً إحصائياً غير خطي (${maxAbsZ.toFixed(2)}σ): ${anomalies.join(' | ')}. هذا التباين يميز ${wName} هيكلياً عن جارتها ${neighborName} ويستوجب تدقيقاً ميدانياً.`
-          : `إحصائياً، مؤشرات ${wName} عبر القطاعات الثماني متسقة داخلياً (دون شذوذ حاد)، وتتركز فجوتها في ${top1.labelAr} مقابل ميزة ${str1.labelAr}.`)
+          : `إحصائياً، مؤشرات ${wName} عبر القطاعات التسعة متسقة داخلياً (دون شذوذ حاد)، وتتركز فجوتها في ${top1.labelAr} مقابل ميزة ${str1.labelAr}.`)
       : (anomalies.length > 0
-          ? `Grok 8-Layer Radar flags non-linear divergence in ${wName} (peak ${maxAbsZ.toFixed(2)}σ): ${anomalies.join(' | ')}. This structurally separates ${wName} from neighbor ${neighborName}.`
+          ? `Grok 9-Layer Radar flags non-linear divergence in ${wName} (peak ${maxAbsZ.toFixed(2)}σ): ${anomalies.join(' | ')}. This structurally separates ${wName} from neighbor ${neighborName}.`
           : `Statistically, ${wName} maintains cross-layer congruence (peak |Z| = ${maxAbsZ.toFixed(2)}σ) with residual variance centered on ${top1.labelEn} vs ${str1.labelEn}.`);
 
     recommendations = isAr ? [
       anomalies.length > 0
         ? `توجيه تفتيش ميداني في ${wName} لمعالجة الشذوذ المرصود: (${anomalies[0]})`
-        : `تفعيل الرصد الآلي الفصلي لـ ${wName} عبر طبقات المياه والصحة والأخطار والنقل (${top1.labelAr})`,
-      `مقارنة قياسات ${wName} ببيانات Sentinel-2 وMSPRH/CRAAG/SNTF ونظيرتها ${neighborName} (${distKm} كم) لرصد أي انحراف > ±1.8σ`
+        : `تفعيل الرصد الآلي الفصلي لـ ${wName} عبر طبقات المياه والصحة والأخطار والنقل والسياحة (${top1.labelAr})`,
+      `مقارنة قياسات ${wName} ببيانات Sentinel-2 وMSPRH/CRAAG/SNTF/MTA ونظيرتها ${neighborName} (${distKm} كم) لرصد أي انحراف > ±1.8σ`
     ] : [
       anomalies.length > 0
         ? `Dispatch targeted audit in ${wName} for primary anomaly: ${anomalies[0]}`
         : `Maintain automated quarterly cross-layer telemetry watch on ${wName} (${top1.labelEn})`,
-      `Benchmark ${wName} against Sentinel-2, MSPRH/CRAAG/SNTF feeds, and neighbor ${neighborName} (${distKm} km) for >1.8σ shifts`
+      `Benchmark ${wName} against Sentinel-2, MSPRH/CRAAG/SNTF/MTA feeds, and neighbor ${neighborName} (${distKm} km) for >1.8σ shifts`
     ];
   }
 
