@@ -7,6 +7,15 @@
 import { AgentAnalysisOutput, AgentProfile, WilayaRecord } from '../types';
 import { computeMoransI, computeGetisOrdGi, computeGravityInteraction, haversineDistance } from './gis';
 import { executeForecastModel } from './quantitative';
+import {
+  getHospitalsCount,
+  getHealthCoverage,
+  getSeismicRisk,
+  getWildfireRisk,
+  getHazardIndex,
+  getTransportScore,
+  hasRailAccess
+} from './reporting';
 
 export const AI_AGENT_PROFILES: AgentProfile[] = [
   {
@@ -153,6 +162,12 @@ interface FactorEntry {
 }
 
 function rankWilayaPressuresAndStrengths(w: WilayaRecord, floodPct: number, droughtRiskPct: number, coverageGapPct: number) {
+  const healthCov = getHealthCoverage(w);
+  const hospitalsCnt = getHospitalsCount(w);
+  const hazardIdx = getHazardIndex(w);
+  const transportSc = getTransportScore(w);
+  const hasRail = hasRailAccess(w);
+
   const pressures: FactorEntry[] = [
     {
       id: 'water',
@@ -165,6 +180,18 @@ function rankWilayaPressuresAndStrengths(w: WilayaRecord, floodPct: number, drou
       score: floodPct * 2.1,
       labelEn: `wadi & flood exposure (${floodPct}%)`,
       labelAr: `تعرض الفيضانات (${floodPct}%)`
+    },
+    {
+      id: 'hazards',
+      score: hazardIdx * 1.35,
+      labelEn: `multi-hazard risk (${hazardIdx}/100: seismic ${Math.round(getSeismicRisk(w) * 100)}%, wildfire ${Math.round(getWildfireRisk(w) * 100)}%)`,
+      labelAr: `الأخطار الطبيعية المركبة (${hazardIdx}/100: زلازل ${Math.round(getSeismicRisk(w) * 100)}%، حرائق ${Math.round(getWildfireRisk(w) * 100)}%)`
+    },
+    {
+      id: 'health_gap',
+      score: (100 - healthCov) * 1.55,
+      labelEn: `healthcare capacity lag (${healthCov}% access, ${hospitalsCnt} hospitals)`,
+      labelAr: `فجوة التغطية الصحية (${healthCov}% تغطية بـ ${hospitalsCnt} مستشفى)`
     },
     {
       id: 'drought',
@@ -186,9 +213,9 @@ function rankWilayaPressuresAndStrengths(w: WilayaRecord, floodPct: number, drou
     },
     {
       id: 'roads',
-      score: (100 - w.roads) * 1.5,
-      labelEn: `transport connectivity lag (${w.roads}% roads)`,
-      labelAr: `محدودية الربط الطرقي (${w.roads}%)`
+      score: (100 - transportSc) * 1.55 + (hasRail ? 0 : 12),
+      labelEn: `transport & rail lag (${transportSc}/100${hasRail ? '' : ', no SNTF rail'})`,
+      labelAr: `محدودية النقل والسكك (${transportSc}/100${hasRail ? '' : '، بدون خط سكك SNTF'})`
     }
   ].sort((a, b) => b.score - a.score);
 
@@ -206,10 +233,16 @@ function rankWilayaPressuresAndStrengths(w: WilayaRecord, floodPct: number, drou
       labelAr: `الجاهزية الصناعية (${w.industry}/100 وطاقة ${w.energy}%)`
     },
     {
-      id: 'roads',
-      score: w.roads * 1.15,
-      labelEn: `logistics & road network (${w.roads}%)`,
-      labelAr: `شبكة الطرق واللوجستيك (${w.roads}%)`
+      id: 'transport',
+      score: transportSc * 1.25 + (hasRail ? 12 : 0),
+      labelEn: `multimodal transport & rail (${transportSc}/100${hasRail ? ', SNTF rail connected' : ''})`,
+      labelAr: `شبكة النقل والسكك (${transportSc}/100${hasRail ? ' مع ربط SNTF' : ''})`
+    },
+    {
+      id: 'health',
+      score: healthCov * 1.15 + hospitalsCnt * 0.8,
+      labelEn: `healthcare resilience (${healthCov}% access, ${hospitalsCnt} hospitals)`,
+      labelAr: `الرصيد الصحي والاستشفائي (${healthCov}% تغطية و${hospitalsCnt} مستشفى)`
     },
     {
       id: 'coverage',
@@ -255,7 +288,14 @@ export function runAgentAnalysis(
   const urbanGrowthPct = Math.round((w.pop / 100) * (w.price / 50000) * horizon * 0.8 + horizon * 1.5);
   const coverageGapPct = Math.max(0, Math.round(100 - w.coverage));
   const floodPct = Math.round(w.flood * 100);
-  const industryScore = Math.round(w.energy * 0.3 + w.roads * 0.3 + w.labor * 0.2 + (100 - Math.abs(w.waterDef)) * 0.2);
+  const healthCov = getHealthCoverage(w);
+  const hospitalsCnt = getHospitalsCount(w);
+  const seismicPct = Math.round(getSeismicRisk(w) * 100);
+  const wildfirePct = Math.round(getWildfireRisk(w) * 100);
+  const hazardIdx = getHazardIndex(w);
+  const transportSc = getTransportScore(w);
+  const railConnected = hasRailAccess(w);
+  const industryScore = Math.round(w.energy * 0.28 + transportSc * 0.32 + w.labor * 0.2 + (100 - Math.abs(w.waterDef)) * 0.2);
 
   // Historical 2018-2025 real deltas
   const histYears = w.historicalYears ?? [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025];
@@ -289,18 +329,23 @@ export function runAgentAnalysis(
   const industryRank = getRank(allWilayas, w, x => x.industry, true);
   const soilRank = getRank(allWilayas, w, x => x.soil, true);
   const popRank = getRank(allWilayas, w, x => x.pop, true);
+  const healthRank = getRank(allWilayas, w, x => getHealthCoverage(x), true);
+  const hazardRank = getRank(allWilayas, w, x => getHazardIndex(x), true);
+  const transportRank = getRank(allWilayas, w, x => getTransportScore(x), true);
 
-  // Composite Risk Score & Rating
+  // Composite Risk Score & Rating (expanded with Health & Hazards & Rail isolation)
   let riskScore = 0;
   if (projectedWaterDeficit < -250 || w.waterDef < -25) riskScore += 2;
   else if (projectedWaterDeficit < -100 || w.waterDef < -10) riskScore += 1;
-  if (floodPct > 40) riskScore += 2; else if (floodPct > 25) riskScore += 1;
+  if (floodPct > 40 || hazardIdx >= 62) riskScore += 2;
+  else if (floodPct > 25 || hazardIdx >= 45) riskScore += 1;
   if (droughtRiskPct > 60) riskScore += 2; else if (droughtRiskPct > 45) riskScore += 1;
+  if (healthCov < 50) riskScore += 2; else if (healthCov < 62) riskScore += 1;
   if (coverageGapPct > 30) riskScore += 1;
-  if (w.roads < 60) riskScore += 1;
+  if (transportSc < 55) riskScore += 1;
 
   const riskRating: AgentAnalysisOutput['riskRating'] =
-    riskScore >= 5 ? 'CRITICAL' : riskScore >= 3 ? 'HIGH' : riskScore >= 1 ? 'WATCH' : 'STABLE';
+    riskScore >= 6 ? 'CRITICAL' : riskScore >= 4 ? 'HIGH' : riskScore >= 2 ? 'WATCH' : 'STABLE';
 
   // Model-calibrated Evidence Quality Score (varies by wilaya completeness AND model type)
   const baseQuality = 86 + ((w.historicalWaterDef?.length ?? 0) >= 6 ? 6 : 0) - (w.isCustomImport ? 4 : 0);
@@ -332,187 +377,135 @@ export function runAgentAnalysis(
     calculations = isAr
       ? {
           'مؤشر Gi* المحلي': localGiZ,
-          'تصنيف البؤرة': localGiClass,
+          'النقل والسكك': `${transportSc}/100 (${railConnected ? 'SNTF' : 'طرقي'})`,
+          'التغطية الصحية': `${healthCov}% (#${healthRank})`,
           'أقرب ولاية': `${neighborName} (${distKm}كم)`,
-          'أقوى قطب جذب': `${gravityName} (${topGravity?.interactionStrength ?? 0})`,
-          'رتبة الفيضانات': `#${floodRank}/${nTotal}`,
-          'تباين الجوار المائي': `${waterLagDelta >= 0 ? '+' : ''}${waterLagDelta}`
+          'الأخطار المركبة': `${hazardIdx}/100 (#${hazardRank})`,
+          'أقوى قطب جذب': `${gravityName} (${topGravity?.interactionStrength ?? 0})`
         }
       : {
           'Local Gi* Z': localGiZ,
-          'Cluster Tier': localGiClass,
+          'Transport & Rail': `${transportSc}/100 (${railConnected ? 'SNTF' : 'Road'})`,
+          'Health Coverage': `${healthCov}% (#${healthRank})`,
           'Nearest Peer': `${neighborName} (${distKm} km)`,
-          'Gravity Pole': `${gravityName} (${topGravity?.interactionStrength ?? 0})`,
-          'Flood Rank': `#${floodRank}/${nTotal}`,
-          'Neighbor Water Lag': `${waterLagDelta >= 0 ? '+' : ''}${waterLagDelta}`
+          'Natural Hazards': `${hazardIdx}/100 (#${hazardRank})`,
+          'Gravity Pole': `${gravityName} (${topGravity?.interactionStrength ?? 0})`
         };
 
     mathematicalFindings = isAr ? [
-      `الارتباط المكاني المحلي لـ ${wName} (Getis-Ord Gi*): Z = ${localGiZ} (${localGiClass}) مقابل موران الوطني I = ${moran.observedI} (p = ${moran.pValue})`,
-      `مصفوفة الجاذبية لـ Huff: أقرب ولاية هي ${neighborName} (${distKm} كم، فارق مائي ${waterLagDelta >= 0 ? '+' : ''}${waterLagDelta})، بينما أقوى تفاعل اقتصادي هو مع ${gravityName} (قوة جذب ${topGravity?.interactionStrength ?? 0})`,
-      `التموقع الجغرافي (${w.lat.toFixed(2)}°N, ${w.lon.toFixed(2)}°E — ${ecoZone.label}): السكان #${popRank}/${nTotal}، الفيضانات ${floodPct}% (#${floodRank}/${nTotal})، والغطاء النباتي NDVI = ${w.ndvi}`
+      `الارتباط المكاني المحلي لـ ${wName} (Getis-Ord Gi*): Z = ${localGiZ} (${localGiClass}) مقابل موران الوطني I = ${moran.observedI} (p = ${moran.pValue})؛ فارق الجوار المائي ${waterLagDelta >= 0 ? '+' : ''}${waterLagDelta}`,
+      `الربط متعدد الوسائط والنفاذ الصحي: مؤشر النقل ${transportSc}/100 (الرتبة #${transportRank}/${nTotal}، السكة الحديدية: ${railConnected ? 'متصلة بشبكة SNTF' : 'غير متصلة'}) والتغطية الصحية ${healthCov}% (${hospitalsCnt} مستشفى)`,
+      `طيف الأخطار المركب (${hazardIdx}/100 — #${hazardRank}/${nTotal}): زلازل ${seismicPct}%، فيضانات ${floodPct}%، وحرائق غابات ${wildfirePct}% في النطاق (${ecoZone.label})`
     ] : [
-      `Spatial Autocorrelation for ${wName}: Local Gi* Z = ${localGiZ} (${localGiClass}) against National Moran's I = ${moran.observedI} (p = ${moran.pValue})`,
-      `Huff Spatial Gravity Matrix: Nearest peer ${neighborName} sits ${distKm} km away (water lag ${waterLagDelta >= 0 ? '+' : ''}${waterLagDelta}); strongest economic pull is toward ${gravityName} (gravity score ${topGravity?.interactionStrength ?? 0})`,
-      `Territorial Coordinates (${w.lat.toFixed(2)}°N, ${w.lon.toFixed(2)}°E · ${ecoZone.label}): Population rank #${popRank}/${nTotal}, flood exposure ${floodPct}% (rank #${floodRank}), NDVI ${w.ndvi}`
+      `Spatial Autocorrelation for ${wName}: Local Gi* Z = ${localGiZ} (${localGiClass}) against National Moran's I = ${moran.observedI} (p = ${moran.pValue}); water lag ${waterLagDelta >= 0 ? '+' : ''}${waterLagDelta}`,
+      `Multimodal Connectivity & Access: Transport score ${transportSc}/100 (rank #${transportRank}/${nTotal}, SNTF rail: ${railConnected ? 'Connected' : 'Road-only'}) and Healthcare coverage ${healthCov}% (${hospitalsCnt} hospitals)`,
+      `Multi-Hazard Spectrum (${hazardIdx}/100 · rank #${hazardRank}/${nTotal}): Seismic ${seismicPct}%, Flood ${floodPct}%, Wildfire ${wildfirePct}% across (${ecoZone.label})`
     ];
 
     spatialDiagnosis = isAr
-      ? `الخريطة الطبوغرافية لولاية ${wName} (${ecoZone.label}) تضعها في بؤرة [${localGiClass}] بضغط أساسي في ${top1.labelAr}، يقابله رصيد قوة مكاني في ${str1.labelAr}. التباين بينها وبين جارتها ${neighborName} (${distKm} كم) يستدعي ${
-          top1.id === 'flood'
-            ? `إزاحة التوسع العمراني بعيداً عن بطون الأودية بنسبة ${floodPct}% نحو المرتفعات الآمنة`
-            : top1.id === 'price'
-            ? `إعادة توجيه التوسع السكني من النواة المشبعة (${w.price.toLocaleString()} دج/م²) عبر محور ${gravityName}`
-            : `فك العزلة المكانية وتحسين التموضع الحضري حول محور الربط مع ${neighborName}`
+      ? `الخريطة الطبوغرافية لولاية ${wName} (${ecoZone.label}) تضعها في بؤرة [${localGiClass}] بضغط أساسي في ${top1.labelAr}، يقابله رصيد قوة مكاني في ${str1.labelAr}. الربط مع جارتها ${neighborName} (${distKm} كم) ${railConnected ? 'مدعوم بالسكة الحديدية SNTF' : 'يعتمد على الشبكة الطرقية فقط'} ويستوجب ${
+          top1.id === 'flood' || top1.id === 'hazards'
+            ? `إبعاد التوسع العمراني عن بؤر الأخطار (${hazardIdx}/100) وأحواض السيول (${floodPct}%)`
+            : top1.id === 'health_gap'
+            ? `توجيه أقطاب استشفائية متنقلة ومستشفيات جوارية لرفع التغطية عن ${healthCov}%`
+            : `تطوير قطب لوجستي ونقل موجه عبر محور ${gravityName}`
         }.`
-      : `Spatial topology of ${wName} (${ecoZone.label}) registers as [${localGiClass}] (Gi* Z = ${localGiZ}), dominated by ${top1.labelEn} alongside a territorial anchor in ${str1.labelEn}. Relative to nearest neighbor ${neighborName} (${distKm} km) and top gravity pole ${gravityName}, ${wName} requires ${
-          top1.id === 'flood'
-            ? `redirecting urban growth away from ${floodPct}% flood-prone basins toward elevated plateaus`
-            : top1.id === 'price'
-            ? `relieving core land saturation (${w.price.toLocaleString()} DZD/m²) along the ${gravityName} transit corridor`
-            : `consolidating spatial nodes around its ${w.roads}% road grid toward ${neighborName}`
+      : `Spatial topology of ${wName} (${ecoZone.label}) registers as [${localGiClass}] dominated by ${top1.labelEn} alongside anchor ${str1.labelEn}. Peer corridor to ${neighborName} (${distKm} km) is ${railConnected ? 'SNTF-rail linked' : 'road-only'}, requiring ${
+          top1.id === 'flood' || top1.id === 'hazards'
+            ? `relocating urban growth away from ${hazardIdx}/100 hazard corridors and wadi basins`
+            : top1.id === 'health_gap'
+            ? `expanding secondary hospital nodes to lift ${healthCov}% access`
+            : `consolidating multimodal transport toward ${gravityName}`
         }.`;
 
     recommendations = isAr ? [
-      top1.id === 'flood'
-        ? `تجميد التجزئات العمرانية في ${wName} ضمن نسبة ${floodPct}% من أحواض الأودية (المرتبة #${floodRank}) وتعديل المخطط التوجيهي PDAU`
-        : top1.id === 'water'
-        ? `رسم نطاقات حماية مكانية (GIS Buffers) حول ${w.wells} بئراً و${w.dams} سدود في ${wName} لكبح العجز (${w.waterDef})`
-        : `تخصيص أقطاب توسع عمراني مبرمجة في ${wName} مرتبطة بمحور ${gravityName} لتخفيف حدة ${top1.labelAr}`,
-      `استغلال ميزة ${wName} في ${str1.labelAr} كقاطرة جهوية مشتركة مع ${neighborName} (${distKm} كم)`,
-      `مراقبة حدود ${wName} ببيانات Sentinel-2 لمنع زحف البناء العشوائي على النطاقات الحساسة (NDVI = ${w.ndvi})`
+      top1.id === 'hazards' || top1.id === 'flood'
+        ? `تجميد التجزئات العمرانية في ${wName} ضمن مناطق الأخطار (${hazardIdx}/100، زلازل ${seismicPct}% وسيول ${floodPct}%) وتعديل PDAU`
+        : `تخصيص أقطاب توسع عمراني آمنة في ${wName} مرتبطة بمحور ${gravityName} (${transportSc}/100 نقل)`,
+      railConnected
+        ? `تعظيم استخدام الخط الحديدي في ${wName} لربط المناطق الصناعية والتموينية مع ${neighborName} (${distKm} كم)`
+        : `مد وصلة سكة حديدية وربط استشفائي عاجل لـ ${wName} لتقليص كلفة النفاذ إلى المستشفيات (${hospitalsCnt} مرفقاً)`,
+      `مراقبة حدود ${wName} ببيانات Sentinel-2 لمنع زحف البناء العشوائي على الغابات والأراضي الحساسة (حرائق ${wildfirePct}%)`
     ] : [
-      top1.id === 'flood'
-        ? `Enforce PDAU setback overlays across ${wName}'s ${floodPct}% flood-exposed wadi corridors (national rank #${floodRank})`
-        : top1.id === 'water'
-        ? `Map GIS protection buffers around ${wName}'s ${w.wells} wells and ${w.dams} dams to contain its ${w.waterDef} balance`
-        : `Zone structured satellite growth nodes in ${wName} anchored to the ${gravityName} gravity corridor to ease ${top1.labelEn}`,
-      `Leverage ${wName}'s ${str1.labelEn} as a cross-wilaya spatial hub linked with ${neighborName} (${distKm} km)`,
-      `Deploy Sentinel-2 boundary tracking over ${wName} (NDVI ${w.ndvi}, soil ${w.soil}/100) to prevent unpermitted land conversion`
+      top1.id === 'hazards' || top1.id === 'flood'
+        ? `Enforce PDAU setback overlays across ${wName}'s high-hazard corridors (${hazardIdx}/100: seismic ${seismicPct}%, flood ${floodPct}%)`
+        : `Zone structured transit-oriented nodes in ${wName} linked with ${gravityName} (${transportSc}/100 connectivity)`,
+      railConnected
+        ? `Leverage ${wName}'s SNTF rail corridor to integrate freight and healthcare access with ${neighborName} (${distKm} km)`
+        : `Prioritize regional rail/express link and emergency clinics for ${wName} (currently ${hospitalsCnt} hospitals, ${healthCov}% access)`,
+      `Track perimeter sprawl and forest margins via Sentinel-2 (wildfire risk ${wildfirePct}%, NDVI ${w.ndvi})`
     ];
   } else if (agentId === 'gemini') {
-    // 2. GEMINI 3 FLASH: 72-Hour Crisis Triage, Exposed Population & Logistics Readiness
-    const exposedPopK = Math.round(w.pop * (Math.max(w.flood, (w.waterDef < -15 ? Math.abs(w.waterDef) / 60 : 0.08))));
-    const mutualAidEtaHrs = Math.max(1, Math.round((distKm / Math.max(35, w.roads * 0.9)) * 10) / 10);
+    // 2. GEMINI 3 FLASH: 72-Hour Crisis Triage, Exposed Population, Hospital Beds & Multi-Hazard Routing
+    const exposedPopK = Math.round(w.pop * (Math.max(w.flood, hazardIdx / 140, (w.waterDef < -15 ? Math.abs(w.waterDef) / 60 : 0.08))));
+    const mutualAidEtaHrs = Math.max(0.8, Math.round((distKm / Math.max(40, transportSc * 0.95)) * 10) / 10);
     const activeTriggerCount = [
       w.waterDef <= -20,
-      floodPct >= 30,
+      hazardIdx >= 55,
+      healthCov < 58,
       droughtRiskPct >= 55,
-      coverageGapPct >= 35,
-      w.roads < 60
+      transportSc < 55
     ].filter(Boolean).length;
 
     calculations = isAr
       ? {
-          'درجة الخطورة': `${riskScore}/7`,
+          'درجة الخطورة': `${riskScore}/10`,
           'تصنيف الإنذار': riskRating,
           'سكان تحت الخطر': `${exposedPopK} ألف`,
-          'إشارات حرجة': activeTriggerCount,
+          'المستشفيات النشطة': `${hospitalsCnt} (${healthCov}%)`,
           'زمن الإمداد': `${mutualAidEtaHrs} سا`,
-          'جاهزية الطرق': `${w.roads}%`
+          'مؤشر الأخطار': `${hazardIdx}/100`
         }
       : {
-          'Severity / 7': `${riskScore}/7`,
+          'Severity / 10': `${riskScore}/10`,
           'Triage Tier': riskRating,
           'Exposed Pop (k)': `${exposedPopK}k`,
-          'Critical Triggers': activeTriggerCount,
+          'Hospital Readiness': `${hospitalsCnt} (${healthCov}%)`,
           'Mutual-Aid ETA': `${mutualAidEtaHrs}h`,
-          'Road Readiness': `${w.roads}%`
+          'Hazard Index': `${hazardIdx}/100`
         };
 
     const triggersList: string[] = [];
     if (w.waterDef <= -20) triggersList.push(isAr ? `أزمة عطش (${w.waterDef})` : `water shock (${w.waterDef})`);
-    if (floodPct >= 30) triggersList.push(isAr ? `سيول (${floodPct}%)` : `flash-flood (${floodPct}%)`);
+    if (hazardIdx >= 55) triggersList.push(isAr ? `أخطار طبيعية (${hazardIdx}/100)` : `multi-hazard (${hazardIdx}/100)`);
+    if (healthCov < 58) triggersList.push(isAr ? `ضغط استشفائي (${healthCov}%)` : `hospital strain (${healthCov}%)`);
     if (droughtRiskPct >= 55) triggersList.push(isAr ? `جفاف (${droughtRiskPct}%)` : `drought (${droughtRiskPct}%)`);
-    if (coverageGapPct >= 35) triggersList.push(isAr ? `عجز تموين (${coverageGapPct}%)` : `supply lag (${coverageGapPct}%)`);
-    if (w.roads < 60) triggersList.push(isAr ? `عزلة طرقات (${w.roads}%)` : `road bottleneck (${w.roads}%)`);
+    if (transportSc < 55) triggersList.push(isAr ? `عزلة نقل (${transportSc}/100)` : `transport bottleneck (${transportSc}/100)`);
 
     mathematicalFindings = isAr ? [
-      `تقييم الفرز السريع لـ ${wName}: مستوى الإنذار [${riskRating}] بدرجة ${riskScore}/7، ويُقدر السكان المعرضون مباشرة بنحو ${exposedPopK} ألف من أصل ${w.pop} ألف نسمة`,
-      `محفزات الأزمة النشطة (${activeTriggerCount}): ${triggersList.length ? triggersList.join(' + ') : `لا توجد عتبات انفجار فورية، مع مراقبة ${top1.labelAr}`}`,
-      `لوجستيك التدخل خلال 72 ساعة: زمن وصول الدعم من ${neighborName} (${distKm} كم) قُدر بـ ${mutualAidEtaHrs} ساعة عبر شبكة طرق بكفاءة ${w.roads}% وطاقة ${w.energy}%`
+      `الفرز السريع لـ ${wName}: مستوى الإنذار [${riskRating}] بدرجة ${riskScore}/10، ويُقدر السكان المعرضون بنحو ${exposedPopK} ألف مقابل قدرة استشفائية تضم ${hospitalsCnt} مستشفى (${healthCov}%)`,
+      `محفزات الأزمة النشطة (${activeTriggerCount}): ${triggersList.length ? triggersList.join(' + ') : `استقرار نسبي مع مراقبة ${top1.labelAr}`}`,
+      `ممر الإغاثة خلال 72 ساعة: زمن وصول الإمداد من ${neighborName} (${distKm} كم) هو ${mutualAidEtaHrs} ساعة عبر شبكة نقل ${transportSc}/100${railConnected ? ' مدعومة بالسكة الحديدية' : ''}`
     ] : [
-      `72h Triage Score for ${wName}: [${riskRating}] tier (${riskScore}/7 severity) with ~${exposedPopK}k residents in direct exposure zones out of ${w.pop}k`,
-      `Active Hazard Triggers (${activeTriggerCount}): ${triggersList.length ? triggersList.join(' + ') : `No threshold breach; active watch on ${top1.labelEn}`}`,
-      `Emergency Response Routing: Mutual-aid convoy from ${neighborName} (${distKm} km) estimated at ${mutualAidEtaHrs}h over ${w.roads}% roads & ${w.energy}% grid reliability`
+      `72h Triage Score for ${wName}: [${riskRating}] tier (${riskScore}/10) with ~${exposedPopK}k residents exposed vs ${hospitalsCnt} hospitals (${healthCov}% access)`,
+      `Active Triggers (${activeTriggerCount}): ${triggersList.length ? triggersList.join(' + ') : `No critical breach; monitoring ${top1.labelEn}`}`,
+      `Relief Logistics Corridor: Mutual-aid convoy from ${neighborName} (${distKm} km) estimated at ${mutualAidEtaHrs}h over ${transportSc}/100 multimodal transport${railConnected ? ' + rail' : ''}`
     ];
 
     spatialDiagnosis = isAr
-      ? `غرفة الأزمات تصنف ${wName} عند مستوى [${riskRating}] لأن الخطر الضاغط الأول هو ${top1.labelAr} متبوعاً بـ ${top2.labelAr}. مع زمن استجابة ${mutualAidEtaHrs} ساعة من ${neighborName}، ${
+      ? `غرفة الأزمات تصنف ${wName} عند مستوى [${riskRating}] بضغط أول في ${top1.labelAr} متبوعاً بـ ${top2.labelAr}. قدرة الاستشفاء (${hospitalsCnt} مرفق، تغطية ${healthCov}%) ومؤشر الأخطار (${hazardIdx}/100) ${
           riskScore >= 4
-            ? `يتطلب الوضع تفعيل خلية الأزمة الولائية فوراً لحماية ${exposedPopK} ألف نسمة وتأمين التموين عبر ${w.markets} سوقاً`
-            : `الوضع يسمح بالتدخل الوقائي المبرمج قبل تفاقم العوامل الثانوية بحلول صيف/خريف ${targetYear}`
+            ? `يتطلبان تفعيل مخطط تنظيم النجدة ORSEC فوراً لحماية ${exposedPopK} ألف نسمة وضمان مسارات الإخلاء الطبي عبر ${neighborName}`
+            : `يسمحان بإجراء مناورات وقائية مبرمجة وصيانة شبكات الإمداد قبل ذروة ${targetYear}`
         }.`
-      : `Crisis triage flags ${wName} at [${riskRating}] driven primarily by ${top1.labelEn} compounded by ${top2.labelEn}. Given a ${mutualAidEtaHrs}h mutual-aid corridor from ${neighborName}, ${
+      : `Crisis triage flags ${wName} at [${riskRating}] driven by ${top1.labelEn} and ${top2.labelEn}. With ${hospitalsCnt} hospitals (${healthCov}% access) and a ${hazardIdx}/100 hazard load, ${
           riskScore >= 4
-            ? `immediate Wilaya Emergency Operations activation is warranted to safeguard ~${exposedPopK}k residents and keep ${w.markets} supply hubs open`
-            : `preventative stabilization can neutralize secondary escalation prior to ${targetYear}`
+            ? `immediate ORSEC civil-protection activation is required to protect ~${exposedPopK}k residents and secure medical evacuation corridors via ${neighborName}`
+            : `preventative stabilization and civil-protection readiness can neutralize risks ahead of ${targetYear}`
         }.`;
 
     recommendations = isAr ? [
-      `خطة 72 ساعة #1 لـ ${wName}: استهداف ${top1.labelAr} فوراً لحماية الفئة المعرضة (~${exposedPopK} ألف نسمة)`,
-      `تجهيز خط إمداد طارئ عبر محور ${wName} ↔ ${neighborName} (${mutualAidEtaHrs} ساعة) وتعزيز الطاقة الاحتياطية (${w.energy}%) للمنشآت الحيوية`,
-      `خطة 72 ساعة #3: تخفيف ضغط ${top2.labelAr} عبر فرق التدخل الميداني والبلديات الأقل تغطية (${w.coverage}%)`
+      `خطة 72 ساعة #1 لـ ${wName}: حماية ${exposedPopK} ألف نسمة من ${top1.labelAr} وتأمين أجنحة الاستعجالات في ${hospitalsCnt} مستشفى`,
+      `تأمين ممر الإخلاء والإمداد الطبي ${wName} ↔ ${neighborName} (${mutualAidEtaHrs} ساعة) وتعزيز المولدات الاحتياطية (${w.energy}%)`,
+      hazardIdx >= 50
+        ? `نشر فرق الحماية المدنية والوقاية من الزلازل/الحرائق (مؤشر الأخطار ${hazardIdx}/100) بالبلديات ذات الكثافة العالية`
+        : `تخفيف ضغط ${top2.labelAr} وتعزيز الفرق الصحية المتنقلة في النطاقات الطرفية (${healthCov}%)`
     ] : [
-      `72h Directive #1 (${wName}): Contain ${top1.labelEn} immediately to protect ~${exposedPopK}k exposed residents`,
-      `Pre-stage emergency logistics along the ${wName}–${neighborName} corridor (${mutualAidEtaHrs}h ETA) and backup power (${w.energy}% grid)`,
-      `72h Directive #3: Deploy rapid municipal units to mitigate ${top2.labelEn} across communes below ${w.coverage}% service coverage`
-    ];
-  } else if (agentId === 'gpt') {
-    // 3. CHATGPT FORESIGHT: Real ARIMA vs Holt-Winters Structural Scenarios to targetYear
-    const arimaWater = executeForecastModel('arima', histYears, histWater, effectiveYears);
-    const holtWater = executeForecastModel('holt_winters', histYears, histWater, effectiveYears);
-    const arimaTarget = arimaWater.forecast[arimaWater.forecast.length - 1]?.value ?? w.waterDef;
-    const holtTarget = holtWater.forecast[holtWater.forecast.length - 1]?.value ?? w.waterDef;
-    const baselineEnd = Math.round(((arimaTarget + holtTarget) / 2) * 10) / 10;
-    const optimisticEnd = Math.round((baselineEnd + Math.abs(baselineEnd) * 0.28 + w.dams * 0.8) * 10) / 10;
-    const pessimisticEnd = Math.round((baselineEnd - Math.max(4, Math.abs(baselineEnd) * 0.25)) * 10) / 10;
-
-    const popGrowthRate = ecoZone.key === 'sahara' ? 0.019 : w.pop > 1200 ? 0.016 : 0.013;
-    const popTarget = Math.round(w.pop * Math.pow(1 + popGrowthRate, horizon));
-    const priceTarget = Math.round(w.price * Math.pow(1 + 0.024 + (w.industry / 100) * 0.016, horizon));
-
-    calculations = isAr
-      ? {
-          [`سكان ${targetYear}`]: `${popTarget} ألف`,
-          [`عقار ${targetYear}`]: `${Math.round(priceTarget / 1000)}ألف دج`,
-          'المسار المتفائل': optimisticEnd,
-          'المسار المرجعي': baselineEnd,
-          'المسار المتشائم': pessimisticEnd,
-          'نمو عمراني %': `+${urbanGrowthPct}%`
-        }
-      : {
-          [`Pop ${targetYear}`]: `${popTarget}k`,
-          [`Price ${targetYear}`]: `${Math.round(priceTarget / 1000)}k DZD`,
-          'Optimistic Def': optimisticEnd,
-          'Baseline Def': baselineEnd,
-          'Pessimistic Def': pessimisticEnd,
-          'Urban Growth': `+${urbanGrowthPct}%`
-        };
-
-    const spread = Math.round(Math.abs(optimisticEnd - pessimisticEnd) * 10) / 10;
-    mathematicalFindings = isAr ? [
-      `توقع السلاسل الزمنية لـ ${wName} حتى ${targetYear}: نموذج ARIMA يعطي (${arimaTarget}) مقابل (${holtTarget}) لنموذج Holt-Winters، باتجاه تاريخي (${waterDelta8y >= 0 ? '+' : ''}${waterDelta8y} منذ 2018)`,
-      `السيناريوهات الثلاثة لـ ${wName} (${targetYear}): متفائل (${optimisticEnd}) | مرجعي (${baselineEnd}) | متشائم (${pessimisticEnd}) — اتساع الفجوة الاستشرافية = ${spread} نقطة`,
-      `التحول الديموغرافي والعقاري: قفزة السكان من ${w.pop} ألف إلى ${popTarget} ألف (+${popTarget - w.pop} ألف)، وارتفاع سعر المتر إلى ~${priceTarget.toLocaleString()} دج/م²`
-    ] : [
-      `Time-Series Convergence for ${wName} (${targetYear}): ARIMA(1,1,1) projects ${arimaTarget} vs Holt-Winters ${holtTarget}, extending an 8-yr shift of ${waterDelta8y >= 0 ? '+' : ''}${waterDelta8y}`,
-      `3-Pathway Envelope (${targetYear}): Optimistic ${optimisticEnd} | Baseline ${baselineEnd} | Pessimistic ${pessimisticEnd} (scenario divergence spread = ${spread} pts)`,
-      `Demographic & Land Horizon: Population expands from ${w.pop}k to ${popTarget}k (+${popTarget - w.pop}k) as land prices approach ~${priceTarget.toLocaleString()} DZD/m²`
-    ];
-
-    spatialDiagnosis = isAr
-      ? `استشراف ${targetYear} لولاية ${wName} يُظهر اتساع الفجوة بين المسارين المتفائل والمتشائم بمقدار ${spread} نقطة مائية مع إضافة +${popTarget - w.pop} ألف ساكن جديد. رهان ${wName} الحاسم ليس استمرار الوضع القائم، بل توظيف ${str1.labelAr} لتمويل فك قيد ${top1.labelAr} قبل وصول الأسعار إلى ${priceTarget.toLocaleString()} دج/م².`
-      : `${targetYear} structural modeling for ${wName} shows a ${spread}-point strategic spread between reform and inertia alongside +${popTarget - w.pop}k additional residents. ${wName}'s long-run trajectory depends on converting its advantage in ${str1.labelEn} into capital resilience against ${top1.labelEn} before land reaches ~${priceTarget.toLocaleString()} DZD/m².`;
-
-    recommendations = isAr ? [
-      `تكييف مخطط الاستثمار العمومي لـ ${wName} مع حجم سكاني يبلغ ${popTarget} ألف نسمة في ${targetYear} (+${urbanGrowthPct}% توسع عمراني)`,
-      `تبني حزمة إصلاحات المسار المتفائل (${optimisticEnd}) لتقليص فجوة الـ ${spread} نقطة ومنع الانزلاق نحو (${pessimisticEnd})`,
-      `استباق وصول العقار إلى ${priceTarget.toLocaleString()} دج/م² عبر تهيئة أقطاب سكنية وصناعية مدمجة تستفيد من ${str1.labelAr}`
-    ] : [
-      `Calibrate ${wName}'s ${targetYear} capital expenditure budget for ${popTarget}k residents and +${urbanGrowthPct}% urban expansion`,
-      `Lock in Optimistic-pathway investments (${optimisticEnd}) to capture the ${spread}-point resilience dividend over Pessimistic drift (${pessimisticEnd})`,
-      `Pre-zone mixed-use urban/industrial reserves in ${wName} before land costs hit ~${priceTarget.toLocaleString()} DZD/m², anchored on ${str1.labelEn}`
+      `72h Directive #1 (${wName}): Protect ~${exposedPopK}k residents from ${top1.labelEn} and pre-alert emergency wards across ${hospitalsCnt} hospitals`,
+      `Secure emergency medical & relief routing along ${wName}–${neighborName} (${mutualAidEtaHrs}h ETA, power grid ${w.energy}%)`,
+      hazardIdx >= 50
+        ? `Pre-deploy Civil Protection units across seismic/wildfire hotspots (hazard index ${hazardIdx}/100)`
+        : `Deploy mobile clinics and rapid municipal response units to under-served communes (${healthCov}% access)`
     ];
   } else if (agentId === 'qwen') {
     // 4. QWEN MAX: Coupled Hydro-Agronomic Balance, Dam/Well Load, SPEI & NDVI Efficiency
@@ -686,94 +679,94 @@ export function runAgentAnalysis(
       `Condition ${wName}'s municipal capital grants on preventative risk compliance (${cbaMultiple}x fiscal CBA benchmark)`
     ];
   } else {
-    // 7. GROK 2: Multivariate Z-Score Outlier Radar & Statistical Divergence
+    // 7. GROK 2: Multivariate Z-Score Outlier Radar & Statistical Divergence (across 8 sectors)
     const priceArr = allWilayas.map(x => x.price);
     const waterArr = allWilayas.map(x => x.waterDef);
-    const floodArr = allWilayas.map(x => x.flood);
-    const covArr = allWilayas.map(x => x.coverage);
-    const indArr = allWilayas.map(x => x.industry);
+    const healthArr = allWilayas.map(x => getHealthCoverage(x));
+    const hazArr = allWilayas.map(x => getHazardIndex(x));
+    const transArr = allWilayas.map(x => getTransportScore(x));
 
     const zPrice = Math.round(((w.price - meanOf(priceArr)) / stdOf(priceArr, meanOf(priceArr))) * 100) / 100;
     const zWater = Math.round(((w.waterDef - meanOf(waterArr)) / stdOf(waterArr, meanOf(waterArr))) * 100) / 100;
-    const zFlood = Math.round(((w.flood - meanOf(floodArr)) / stdOf(floodArr, meanOf(floodArr))) * 100) / 100;
-    const zCov = Math.round(((w.coverage - meanOf(covArr)) / stdOf(covArr, meanOf(covArr))) * 100) / 100;
-    const zInd = Math.round(((w.industry - meanOf(indArr)) / stdOf(indArr, meanOf(indArr))) * 100) / 100;
+    const zHealth = Math.round(((healthCov - meanOf(healthArr)) / stdOf(healthArr, meanOf(healthArr))) * 100) / 100;
+    const zHazard = Math.round(((hazardIdx - meanOf(hazArr)) / stdOf(hazArr, meanOf(hazArr))) * 100) / 100;
+    const zTrans = Math.round(((transportSc - meanOf(transArr)) / stdOf(transArr, meanOf(transArr))) * 100) / 100;
 
     const anomalies: string[] = [];
-    if (w.price > 95000 && w.flood >= 0.28) {
+    if (w.price > 95000 && (w.flood >= 0.28 || hazardIdx >= 55)) {
       anomalies.push(isAr
-        ? `مفارقة سعر/فيضان في ${wName}: عقار مرتفع (${w.price.toLocaleString()} دج/م²) داخل تعرض فيضانات ${floodPct}%`
-        : `Price-Hazard Paradox in ${wName}: elevated land price (${w.price.toLocaleString()} DZD/m²) overlapping ${floodPct}% flood exposure`);
+        ? `مفارقة سعر/خطر في ${wName}: عقار مرتفع (${w.price.toLocaleString()} دج/م²) داخل منطقة أخطار ${hazardIdx}/100`
+        : `Price-Hazard Paradox in ${wName}: high land price (${w.price.toLocaleString()} DZD/m²) inside ${hazardIdx}/100 multi-hazard belt`);
     }
-    if (w.ndvi < 0.28 && w.soil >= 50 && w.rain >= 280) {
+    if (healthCov < 55 && w.pop >= 450) {
       anomalies.push(isAr
-        ? `تباعد نباتي في ${wName}: NDVI منخفض (${w.ndvi}) رغم تربة ${w.soil}/100 وتساقط ${w.rain} ملم`
-        : `NDVI-Soil Gap in ${wName}: muted NDVI (${w.ndvi}) despite grade-${w.soil} soil & ${w.rain} mm rainfall`);
+        ? `عجز استشفائي حاد في ${wName}: تغطية صحية ${healthCov}% فقط (${hospitalsCnt} مستشفى) لـ ${w.pop} ألف نسمة`
+        : `Healthcare Bottleneck in ${wName}: ${healthCov}% coverage (${hospitalsCnt} hospitals) for ${w.pop}k residents`);
+    }
+    if (!railConnected && w.industry >= 60) {
+      anomalies.push(isAr
+        ? `انقطاع لوجستي في ${wName}: نسيج صناعي نشط (${w.industry}/100) دون ربط بالسكك الحديدية SNTF`
+        : `Rail-Industry Disconnect in ${wName}: active industrial base (${w.industry}/100) lacking SNTF rail link`);
     }
     if (w.waterDef <= -24 && w.wells >= 650) {
       anomalies.push(isAr
         ? `استنزاف جوفي حاد في ${wName}: عجز ${w.waterDef} مع تركز ${w.wells} بئر`
         : `Borehole Overdraft Signal in ${wName}: ${w.waterDef} deficit paired with ${w.wells} deep wells`);
     }
-    if (coverageGapPct >= 35) {
+    if (Math.abs(zPrice) >= 1.5 || Math.abs(zHazard) >= 1.5 || Math.abs(zHealth) >= 1.5 || Math.abs(zTrans) >= 1.5) {
       anomalies.push(isAr
-        ? `شذوذ تمويني في ${wName}: فجوة تغطية ${coverageGapPct}% (${w.markets} سوقاً لـ ${w.pop} ألف نسمة)`
-        : `Retail Deficit Outlier in ${wName}: ${coverageGapPct}% coverage gap (${w.markets} markets for ${w.pop}k residents)`);
-    }
-    if (Math.abs(zPrice) >= 1.5 || Math.abs(zFlood) >= 1.5 || Math.abs(zWater) >= 1.5 || Math.abs(zInd) >= 1.5) {
-      anomalies.push(isAr
-        ? `ذيل توزيع إحصائي في ${wName}: Z(عقار)=${zPrice}، Z(فيضان)=${zFlood}، Z(مياه)=${zWater}`
-        : `Extreme Z-Tail in ${wName}: Z(Price)=${zPrice}, Z(Flood)=${zFlood}, Z(Water)=${zWater}`);
+        ? `ذيل إحصائي متطرف في ${wName}: Z(صحة)=${zHealth}، Z(أخطار)=${zHazard}، Z(نقل)=${zTrans}`
+        : `Extreme Z-Tail in ${wName}: Z(Health)=${zHealth}, Z(Hazards)=${zHazard}, Z(Transport)=${zTrans}`);
     }
 
-    const maxAbsZ = Math.max(Math.abs(zPrice), Math.abs(zWater), Math.abs(zFlood), Math.abs(zCov), Math.abs(zInd));
+    const maxAbsZ = Math.max(Math.abs(zPrice), Math.abs(zWater), Math.abs(zHealth), Math.abs(zHazard), Math.abs(zTrans));
 
     calculations = isAr
       ? {
           'Z(العقار)': zPrice,
           'Z(المياه)': zWater,
-          'Z(الفيضانات)': zFlood,
-          'Z(التغطية)': zCov,
-          'Z(الصناعة)': zInd,
+          'Z(الصحة)': zHealth,
+          'Z(الأخطار)': zHazard,
+          'Z(النقل)': zTrans,
           'إشارات الشذوذ': anomalies.length
         }
       : {
           'Z(Price)': zPrice,
           'Z(Water)': zWater,
-          'Z(Flood)': zFlood,
-          'Z(Coverage)': zCov,
-          'Z(Industry)': zInd,
+          'Z(Health)': zHealth,
+          'Z(Hazards)': zHazard,
+          'Z(Transport)': zTrans,
           'Anomalies': anomalies.length
         };
 
     mathematicalFindings = isAr ? [
-      `رادار التباين متعدد المتغيرات لـ ${wName}: تم رصد ${anomalies.length} شذوذات إحصائية (أقصى انحراف معياري = ${maxAbsZ.toFixed(2)}σ)`,
-      anomalies[0] || `تتبع ${wName} توزيعاً مستقراً نسبياً (أقصى Z = ${maxAbsZ.toFixed(2)}σ) مقارنة بالمتوسط الوطني (${avgWaterDef} عجز مائي، ${avgPrice.toLocaleString()} دج/م²)`,
-      `بصمة التطرف في ${wName}: Z(عقار)=${zPrice}، Z(مياه)=${zWater}، Z(فيضانات)=${zFlood}، Z(صناعة)=${zInd} مقابل جارتها ${neighborName}`
+      `رادار التباين متعدد المتغيرات لـ ${wName}: رُصدت ${anomalies.length} شذوذات عبر الطبقات الثماني (أقصى انحراف = ${maxAbsZ.toFixed(2)}σ)`,
+      anomalies[0] || `تتبع ${wName} توزيعاً مستقراً نسبياً (أقصى Z = ${maxAbsZ.toFixed(2)}σ) مقارنة بالمتوسط الوطني (${avgWaterDef} عجز، ${avgPrice.toLocaleString()} دج/م²)`,
+      `بصمة التطرف في ${wName}: Z(صحة)=${zHealth}، Z(أخطار)=${zHazard}، Z(نقل)=${zTrans}، Z(مياه)=${zWater} مقابل جارتها ${neighborName}`
     ] : [
-      `Multivariate Z-Score Radar for ${wName}: Flagged ${anomalies.length} statistical anomalies (peak deviation = ${maxAbsZ.toFixed(2)}σ)`,
-      anomalies[0] || `${wName} tracks within normal national dispersion (max |Z| = ${maxAbsZ.toFixed(2)}σ vs national mean ${avgPrice.toLocaleString()} DZD/m² & ${avgWaterDef} water balance)`,
-      `Dispersion Signature (${wName} vs ${neighborName}): Z(Price)=${zPrice}, Z(Water)=${zWater}, Z(Flood)=${zFlood}, Z(Industry)=${zInd}`
+      `8-Layer Multivariate Z-Radar for ${wName}: Flagged ${anomalies.length} statistical anomalies (peak deviation = ${maxAbsZ.toFixed(2)}σ)`,
+      anomalies[0] || `${wName} tracks within normal dispersion (max |Z| = ${maxAbsZ.toFixed(2)}σ vs national ${avgPrice.toLocaleString()} DZD/m² & ${avgWaterDef} water balance)`,
+      `Dispersion Signature (${wName} vs ${neighborName}): Z(Health)=${zHealth}, Z(Hazards)=${zHazard}, Z(Transport)=${zTrans}, Z(Water)=${zWater}`
     ];
 
     spatialDiagnosis = isAr
       ? (anomalies.length > 0
-          ? `رادار Grok يرصد في ${wName} انحرافاً إحصائياً غير خطي (${maxAbsZ.toFixed(2)}σ): ${anomalies.join(' | ')}. هذا التناقض يميز ${wName} هيكلياً عن جارتها ${neighborName} ويستوجب تدقيقاً ميدانياً.`
-          : `إحصائياً، مؤشرات ${wName} متسقة داخلياً (جميع قيم Z دون عتبة الشذوذ الحاد)، لكن تباينها الأبرز يكمن في ${top1.labelAr} مقابل ميزة ${str1.labelAr}.`)
+          ? `رادار Grok يرصد في ${wName} انحرافاً إحصائياً غير خطي (${maxAbsZ.toFixed(2)}σ): ${anomalies.join(' | ')}. هذا التباين يميز ${wName} هيكلياً عن جارتها ${neighborName} ويستوجب تدقيقاً ميدانياً.`
+          : `إحصائياً، مؤشرات ${wName} عبر القطاعات الثماني متسقة داخلياً (دون شذوذ حاد)، وتتركز فجوتها في ${top1.labelAr} مقابل ميزة ${str1.labelAr}.`)
       : (anomalies.length > 0
-          ? `Grok Anomaly Radar flags non-linear divergence in ${wName} (peak ${maxAbsZ.toFixed(2)}σ): ${anomalies.join(' | ')}. This structurally separates ${wName} from neighbor ${neighborName} and warrants targeted field verification.`
-          : `Statistically, ${wName} exhibits internal metric congruence (peak |Z| = ${maxAbsZ.toFixed(2)}σ) without acute cross-layer contradiction, with residual variance centered on ${top1.labelEn} vs ${str1.labelEn}.`);
+          ? `Grok 8-Layer Radar flags non-linear divergence in ${wName} (peak ${maxAbsZ.toFixed(2)}σ): ${anomalies.join(' | ')}. This structurally separates ${wName} from neighbor ${neighborName}.`
+          : `Statistically, ${wName} maintains cross-layer congruence (peak |Z| = ${maxAbsZ.toFixed(2)}σ) with residual variance centered on ${top1.labelEn} vs ${str1.labelEn}.`);
 
     recommendations = isAr ? [
       anomalies.length > 0
-        ? `توجيه تفتيش ميداني في ${wName} للتحقق من الشذوذ الرئيسي: (${anomalies[0]})`
-        : `تفعيل الرصد الآلي الفصلي لـ ${wName} لمتابعة التغيرات في ${top1.labelAr}`,
-      `مقارنة بيانات ${wName} كل 5 أيام بصور Sentinel-2 وقياسات ${neighborName} (${distKm} كم) لرصد أي انحراف يتجاوز ±1.8σ`
+        ? `توجيه تفتيش ميداني في ${wName} لمعالجة الشذوذ المرصود: (${anomalies[0]})`
+        : `تفعيل الرصد الآلي الفصلي لـ ${wName} عبر طبقات المياه والصحة والأخطار والنقل (${top1.labelAr})`,
+      `مقارنة قياسات ${wName} ببيانات Sentinel-2 وMSPRH/CRAAG/SNTF ونظيرتها ${neighborName} (${distKm} كم) لرصد أي انحراف > ±1.8σ`
     ] : [
       anomalies.length > 0
-        ? `Launch targeted field verification in ${wName} to audit primary anomaly: ${anomalies[0]}`
-        : `Keep ${wName} on automated quarterly telemetry tracking for early drift in ${top1.labelEn}`,
-      `Benchmark ${wName} (${w.lat.toFixed(2)}°N, ${w.lon.toFixed(2)}°E) every 5 days against Sentinel-2 and neighbor ${neighborName} (${distKm} km) for >1.8σ shifts`
+        ? `Dispatch targeted audit in ${wName} for primary anomaly: ${anomalies[0]}`
+        : `Maintain automated quarterly cross-layer telemetry watch on ${wName} (${top1.labelEn})`,
+      `Benchmark ${wName} against Sentinel-2, MSPRH/CRAAG/SNTF feeds, and neighbor ${neighborName} (${distKm} km) for >1.8σ shifts`
     ];
   }
 

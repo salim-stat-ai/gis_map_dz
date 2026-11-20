@@ -152,6 +152,9 @@ export interface ScenarioImpact {
   urbanGrowthPct: number;
   agriculturalOutputIndex: number;
   industrialCapacityIndex: number;
+  healthCoveragePct: number;
+  hazardRiskScore: number;
+  transportConnectivityScore: number;
 }
 
 export interface ScenarioPathway {

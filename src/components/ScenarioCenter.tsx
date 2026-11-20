@@ -7,7 +7,7 @@
 import React, { useState } from 'react';
 import { ScenarioPathway, WilayaRecord } from '../types';
 import { generateAllPathways, DEFAULT_SCENARIO_DRIVERS, ScenarioDriverSettings } from '../engines/scenario';
-import { GitBranch, Sliders, Droplets, Wheat, Building2, Factory, RefreshCw } from 'lucide-react';
+import { GitBranch, Sliders, Droplets, Wheat, Building2, Factory, RefreshCw, HeartPulse, ShieldAlert, TrainFront } from 'lucide-react';
 
 interface ScenarioCenterProps {
   wilayas: WilayaRecord[];
@@ -109,7 +109,7 @@ export const ScenarioCenter: React.FC<ScenarioCenterProps> = ({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Pop Growth */}
           <div className="bg-[#101D38] p-3 rounded-xl border border-white/5 space-y-1.5">
             <div className="flex justify-between text-xs">
@@ -196,6 +196,57 @@ export const ScenarioCenter: React.FC<ScenarioCenterProps> = ({
               className="w-full accent-amber-400 h-1.5 cursor-pointer"
             />
           </div>
+
+          {/* Health Infrastructure Investment */}
+          <div className="bg-[#101D38] p-3 rounded-xl border border-white/5 space-y-1.5">
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-300">{isAr ? 'الاستثمار الصحي والمستشفيات' : 'Health Infra Capex'}</span>
+              <b className="text-rose-400 font-mono">+{drivers.healthInfraInvestmentPct}%</b>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="45"
+              step="2"
+              value={drivers.healthInfraInvestmentPct}
+              onChange={(e) => setDrivers({ ...drivers, healthInfraInvestmentPct: Number(e.target.value) })}
+              className="w-full accent-rose-400 h-1.5 cursor-pointer"
+            />
+          </div>
+
+          {/* Hazard Mitigation Strictness */}
+          <div className="bg-[#101D38] p-3 rounded-xl border border-white/5 space-y-1.5">
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-300">{isAr ? 'الوقاية من الأخطار (زلازل/حرائق)' : 'Hazard Mitigation (RPA)'}</span>
+              <b className="text-orange-400 font-mono">{drivers.hazardMitigationStrictness}/100</b>
+            </div>
+            <input
+              type="range"
+              min="15"
+              max="95"
+              step="5"
+              value={drivers.hazardMitigationStrictness}
+              onChange={(e) => setDrivers({ ...drivers, hazardMitigationStrictness: Number(e.target.value) })}
+              className="w-full accent-orange-400 h-1.5 cursor-pointer"
+            />
+          </div>
+
+          {/* Rail & Transport Expansion */}
+          <div className="bg-[#101D38] p-3 rounded-xl border border-white/5 space-y-1.5">
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-300">{isAr ? 'توسعة السكك والنقل' : 'Rail & Transit Capex'}</span>
+              <b className="text-cyan-400 font-mono">+{drivers.transportRailExpansionPct}%</b>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="50"
+              step="2"
+              value={drivers.transportRailExpansionPct}
+              onChange={(e) => setDrivers({ ...drivers, transportRailExpansionPct: Number(e.target.value) })}
+              className="w-full accent-cyan-400 h-1.5 cursor-pointer"
+            />
+          </div>
         </div>
       </div>
 
@@ -273,6 +324,32 @@ export const ScenarioCenter: React.FC<ScenarioCenterProps> = ({
                     <span>{isAr ? 'مؤشر الإنتاج الصناعي' : 'Industrial Index'}</span>
                   </span>
                   <b className="font-mono text-sm text-emerald-400">{impact.industrialCapacityIndex}/100</b>
+                </div>
+
+                <div className="flex justify-between items-center bg-[#091224] p-2.5 rounded-lg border border-white/5">
+                  <span className="flex items-center gap-1.5 text-slate-300">
+                    <HeartPulse className="w-3.5 h-3.5 text-rose-400" />
+                    <span>{isAr ? 'التغطية الصحية المتوقعة' : 'Health Coverage'}</span>
+                  </span>
+                  <b className="font-mono text-sm text-rose-300">{impact.healthCoveragePct}%</b>
+                </div>
+
+                <div className="flex justify-between items-center bg-[#091224] p-2.5 rounded-lg border border-white/5">
+                  <span className="flex items-center gap-1.5 text-slate-300">
+                    <ShieldAlert className="w-3.5 h-3.5 text-orange-400" />
+                    <span>{isAr ? 'مؤشر الأخطار الطبيعية' : 'Hazard Exposure'}</span>
+                  </span>
+                  <b className={`font-mono text-sm ${impact.hazardRiskScore > 55 ? 'text-rose-400' : 'text-orange-300'}`}>
+                    {impact.hazardRiskScore}/100
+                  </b>
+                </div>
+
+                <div className="flex justify-between items-center bg-[#091224] p-2.5 rounded-lg border border-white/5">
+                  <span className="flex items-center gap-1.5 text-slate-300">
+                    <TrainFront className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>{isAr ? 'ربط النقل والسكك' : 'Transport & Rail'}</span>
+                  </span>
+                  <b className="font-mono text-sm text-cyan-400">{impact.transportConnectivityScore}/100</b>
                 </div>
               </div>
 

@@ -9,6 +9,7 @@ import { Chart as ChartJS, registerables } from 'chart.js';
 import { ForecastModelType, ForecastResult, WilayaRecord } from '../types';
 import { executeForecastModel } from '../engines/quantitative';
 import { runModelTournament, BenchmarkTournamentResult } from '../engines/evaluation';
+import { getHospitalsCount, getHealthCoverage, getHazardIndex, getTransportScore, hasRailAccess } from '../engines/reporting';
 import { TrendingUp, Cpu, Award, HelpCircle, ShieldCheck, BookOpen, Lightbulb, Layers, ChevronDown, ChevronUp } from 'lucide-react';
 
 ChartJS.register(...registerables);
@@ -31,7 +32,9 @@ export const QuantitativeCenter: React.FC<QuantitativeCenterProps> = ({
   const chartInstance = useRef<ChartJS | null>(null);
 
   const [selectedModel, setSelectedModel] = useState<ForecastModelType>('arima');
-  const [selectedMetricKey, setSelectedMetricKey] = useState<'waterDef' | 'rain' | 'pop' | 'price'>('waterDef');
+  const [selectedMetricKey, setSelectedMetricKey] = useState<
+    'waterDef' | 'rain' | 'pop' | 'price' | 'healthCoverage' | 'hazardIndex' | 'transportScore'
+  >('waterDef');
   const [forecastResult, setForecastResult] = useState<ForecastResult | null>(null);
   const [tournamentResult, setTournamentResult] = useState<BenchmarkTournamentResult | null>(null);
   const [showAllFamilies, setShowAllFamilies] = useState<boolean>(false);
@@ -58,6 +61,57 @@ export const QuantitativeCenter: React.FC<QuantitativeCenterProps> = ({
         years: defaultYears,
         values: selectedWilaya.historicalPop ?? [selectedWilaya.pop - 56, selectedWilaya.pop - 48, selectedWilaya.pop - 40, selectedWilaya.pop - 32, selectedWilaya.pop - 24, selectedWilaya.pop - 16, selectedWilaya.pop - 8, selectedWilaya.pop],
         label: isAr ? 'السكان (بالآلاف)' : 'Population (thousands)'
+      };
+    }
+    if (selectedMetricKey === 'healthCoverage') {
+      const curr = getHealthCoverage(selectedWilaya);
+      return {
+        years: defaultYears,
+        values: [
+          Math.max(15, Math.round((curr - 7) * 10) / 10),
+          Math.max(15, Math.round((curr - 6) * 10) / 10),
+          Math.max(15, Math.round((curr - 5.5) * 10) / 10),
+          Math.max(15, Math.round((curr - 4.2) * 10) / 10),
+          Math.max(15, Math.round((curr - 3.1) * 10) / 10),
+          Math.max(15, Math.round((curr - 2.0) * 10) / 10),
+          Math.max(15, Math.round((curr - 0.9) * 10) / 10),
+          curr
+        ],
+        label: isAr ? 'التغطية الصحية (%)' : 'Healthcare Coverage (%)'
+      };
+    }
+    if (selectedMetricKey === 'hazardIndex') {
+      const curr = getHazardIndex(selectedWilaya);
+      return {
+        years: defaultYears,
+        values: [
+          Math.max(5, Math.round((curr - 5.2) * 10) / 10),
+          Math.max(5, Math.round((curr - 4.1) * 10) / 10),
+          Math.max(5, Math.round((curr - 3.6) * 10) / 10),
+          Math.max(5, Math.round((curr - 2.4) * 10) / 10),
+          Math.max(5, Math.round((curr - 1.9) * 10) / 10),
+          Math.max(5, Math.round((curr - 1.2) * 10) / 10),
+          Math.max(5, Math.round((curr - 0.5) * 10) / 10),
+          curr
+        ],
+        label: isAr ? 'مؤشر الأخطار الطبيعية (/100)' : 'Composite Hazard Index (/100)'
+      };
+    }
+    if (selectedMetricKey === 'transportScore') {
+      const curr = getTransportScore(selectedWilaya);
+      return {
+        years: defaultYears,
+        values: [
+          Math.max(18, Math.round((curr - 8.4) * 10) / 10),
+          Math.max(18, Math.round((curr - 7.1) * 10) / 10),
+          Math.max(18, Math.round((curr - 6.0) * 10) / 10),
+          Math.max(18, Math.round((curr - 4.8) * 10) / 10),
+          Math.max(18, Math.round((curr - 3.5) * 10) / 10),
+          Math.max(18, Math.round((curr - 2.2) * 10) / 10),
+          Math.max(18, Math.round((curr - 1.1) * 10) / 10),
+          curr
+        ],
+        label: isAr ? 'مؤشر النقل والسكك (/100)' : 'Transport & Rail Connectivity (/100)'
       };
     }
     return {
@@ -264,6 +318,61 @@ export const QuantitativeCenter: React.FC<QuantitativeCenterProps> = ({
             : `Plan urban land, housing allocations, and utility capacity ahead of the ${fmtNum(Math.max(0, projDelta30))}k resident increase projected by 2030.`
         };
       }
+      if (selectedMetricKey === 'healthCoverage') {
+        const hospitals = getHospitalsCount(selectedWilaya);
+        return {
+          unitLabel: isAr ? '% تغطية صحية' : '% health coverage',
+          historicalMeaning: isAr
+            ? `انتقلت التغطية الصحية في ${wilayaName} (${hospitals} هياكل استشفائية) من ${fmtNum(startVal)}% (${startYr}) إلى ${fmtNum(lastHistVal)}% (${lastHistYr}) بتحسن قدره ${fmtSigned(histDelta)}%.`
+            : `Health coverage in ${wilayaName} (${hospitals} hospital facilities) shifted from ${fmtNum(startVal)}% (${startYr}) to ${fmtNum(lastHistVal)}% (${lastHistYr}) (${fmtSigned(histDelta)}%).`,
+          forecastMeaning: isAr
+            ? `بدون توسيع المراكز الاستشفائية الجامعية والعيادات الجوارية، تصل التغطية المتوقعة إلى ${fmtNum(f2030.value)}% في 2030 و${fmtNum(f2035.value)}% في 2035.`
+            : `Without additional hospital & polyclinic expansion, baseline health coverage reaches ${fmtNum(f2030.value)}% by 2030 and ${fmtNum(f2035.value)}% by 2035.`,
+          bandMeaning: isAr
+            ? `نطاق الثقة (${fmtNum(f2035.lower95 ?? f2035.value)}% – ${fmtNum(f2035.upper95 ?? f2035.value)}%) يرتبط بتوظيف الأطباء الأخصائيين وفك العزلة عبر النقل الطبي.`
+            : `The 95% confidence band (${fmtNum(f2035.lower95 ?? f2035.value)}% – ${fmtNum(f2035.upper95 ?? f2035.value)}%) hinges on specialist retention and clinic capacity.`,
+          actionNote: isAr
+            ? `لصانع القرار في ${wilayaName}: رفع التغطية نحو الحد الأعلى (${fmtNum(f2035.upper95 ?? f2035.value)}%) يستوجب استثماراً موجهاً لـ MSPRH وتجهيز أقسام الاستعجالات.`
+            : `Targeted MSPRH hospital upgrades and medical staffing are required to push ${wilayaName} toward the upper ${fmtNum(f2035.upper95 ?? f2035.value)}% bound.`
+        };
+      }
+      if (selectedMetricKey === 'hazardIndex') {
+        return {
+          unitLabel: isAr ? 'نقطة / 100 خطر طبيعي' : 'pts / 100 hazard exposure',
+          historicalMeaning: isAr
+            ? `تراوح مؤشر الأخطار الطبيعية المركب (زلازل، حرائق غابات، فيضانات) في ${wilayaName} بين ${fmtNum(startVal)} (${startYr}) و${fmtNum(lastHistVal)}/100 (${lastHistYr}) بتغير ${fmtSigned(histDelta)}.`
+            : `Composite Natural Hazard exposure (seismic, wildfire, flood) in ${wilayaName} moved from ${fmtNum(startVal)} (${startYr}) to ${fmtNum(lastHistVal)}/100 (${lastHistYr}).`,
+          forecastMeaning: isAr
+            ? `تحت تأثير التطرف المناخي والضغط العمراني، قد يبلغ المؤشر ${fmtNum(f2030.value)}/100 في 2030 و${fmtNum(f2035.value)}/100 في 2035 إذا لم تُفعّل إجراءات الوقاية.`
+            : `Climate extremes and urban pressure lift baseline hazard exposure toward ${fmtNum(f2030.value)}/100 in 2030 and ${fmtNum(f2035.value)}/100 in 2035.`,
+          bandMeaning: isAr
+            ? `النطاق (${fmtNum(f2035.lower95 ?? f2035.value)} – ${fmtNum(f2035.upper95 ?? f2035.value)}) يميز بين سيناريو التزام عمراني بمعايير RPA وأحزمة الغابات، مقابل موجات حر وفيضانات حادة.`
+            : `The confidence cone (${fmtNum(f2035.lower95 ?? f2035.value)} – ${fmtNum(f2035.upper95 ?? f2035.value)}) spans strict RPA/firebreak compliance vs severe climate spikes.`,
+          actionNote: isAr
+            ? `لصانع القرار في ${wilayaName}: التنسيق بين CRAAG والحماية المدنية لتحديث مخططات ORSEC ومنع البناء في مجاري السيول يخفض الخطر بفعالية.`
+            : `Enforce CRAAG seismic codes (RPA), wildfire buffer strips, and DGPC ORSEC flood readiness ahead of the ${fmtNum(f2035.upper95 ?? f2035.value)} upper risk bound.`
+        };
+      }
+      if (selectedMetricKey === 'transportScore') {
+        const railStr = hasRailAccess(selectedWilaya)
+          ? (isAr ? 'مرتبطة بالسكك الحديدية SNTF' : 'SNTF rail-connected')
+          : (isAr ? 'غير مرتبطة بعد بالسكك' : 'awaiting rail link');
+        return {
+          unitLabel: isAr ? 'نقطة / 100 نقل وربط' : 'pts / 100 transport score',
+          historicalMeaning: isAr
+            ? `تطور مؤشر النقل والربط اللوجستي في ${wilayaName} (${railStr}) من ${fmtNum(startVal)} (${startYr}) إلى ${fmtNum(lastHistVal)}/100 (${lastHistYr}).`
+            : `Transport & logistics connectivity in ${wilayaName} (${railStr}) progressed from ${fmtNum(startVal)} (${startYr}) to ${fmtNum(lastHistVal)}/100 (${lastHistYr}).`,
+          forecastMeaning: isAr
+            ? `المسار المرجعي يقدر بلوغ ${fmtNum(f2030.value)}/100 في 2030 و${fmtNum(f2035.value)}/100 في 2035 تبعاً لوتيرة صيانة الطرق واستغلال المحاور الحالية.`
+            : `Baseline trajectory projects ${fmtNum(f2030.value)}/100 in 2030 and ${fmtNum(f2035.value)}/100 in 2035 under steady maintenance.`,
+          bandMeaning: isAr
+            ? `الفجوة بين ${fmtNum(f2035.lower95 ?? f2035.value)} و${fmtNum(f2035.upper95 ?? f2035.value)} تعكس أثر تسريع مشاريع ازدواجية الطرق وربط خطوط السكك الحديدية الجديدة.`
+            : `The 2035 band (${fmtNum(f2035.lower95 ?? f2035.value)} – ${fmtNum(f2035.upper95 ?? f2035.value)}) captures expressway upgrades and new rail corridor commissioning.`,
+          actionNote: isAr
+            ? `لصانع القرار في ${wilayaName}: ربط المناطق الصناعية والفلاحية بمحاور SNTF والطرق السريعة يسرّع الوصول للحد الأعلى (${fmtNum(f2035.upper95 ?? f2035.value)}).`
+            : `Linking logistics platforms to SNTF freight corridors and highways unlocks the ${fmtNum(f2035.upper95 ?? f2035.value)} upper trajectory.`
+        };
+      }
       return {
         unitLabel: isAr ? 'دج / م²' : 'DZD / m²',
         historicalMeaning: isAr
@@ -446,6 +555,9 @@ export const QuantitativeCenter: React.FC<QuantitativeCenterProps> = ({
               <option value="rain">{isAr ? '🌧️ التساقطات المطرية (ملم)' : '🌧️ Rainfall (mm)'}</option>
               <option value="pop">{isAr ? '👥 السكان (بالآلاف)' : '👥 Population (k)'}</option>
               <option value="price">{isAr ? '🏠 أسعار العقار (دج/م²)' : '🏠 Land Price (DZD/m²)'}</option>
+              <option value="healthCoverage">{isAr ? '🏥 التغطية الصحية (%)' : '🏥 Healthcare Coverage (%)'}</option>
+              <option value="hazardIndex">{isAr ? '🌋 الأخطار الطبيعية (/100)' : '🌋 Natural Hazards Index (/100)'}</option>
+              <option value="transportScore">{isAr ? '🚆 النقل والسكك (/100)' : '🚆 Transport & Rail (/100)'}</option>
             </select>
           </div>
         </div>

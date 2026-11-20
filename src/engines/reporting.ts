@@ -15,7 +15,7 @@ import { AI_AGENT_PROFILES, runAgentAnalysis } from './agents';
 
 export type ReportMode = 'legacy' | 'modern' | 'combined';
 export type ReportScope = 'wilaya' | 'compare' | 'case' | 'national';
-export type ThematicCaseKey = 'water' | 'drought' | 'urban' | 'retail' | 'flood' | 'industry' | 'anomaly';
+export type ThematicCaseKey = 'water' | 'drought' | 'urban' | 'retail' | 'flood' | 'industry' | 'health' | 'hazards' | 'transport' | 'anomaly';
 export type ReportLang = 'ar' | 'en' | 'fr';
 
 export interface ReportGenerationOptions {
@@ -200,12 +200,18 @@ export function riskOf(w: WilayaRecord, year: number): number {
   const pw = predictWater(w, year);
   const cr = cropRisk(w, year);
   const cg = coverageGap(w);
+  const hc = getHealthCoverage(w);
+  const hi = getHazardIndex(w);
+  const ts = getTransportScore(w);
   let s = 0;
   if (pw < -250 || w.waterDef < -25) s += 2; else if (pw < -100 || w.waterDef < -10) s += 1;
   if (w.flood > 0.4) s += 2; else if (w.flood > 0.25) s += 1;
   if (cr > 60) s += 2; else if (cr > 45) s += 1;
   if (cg > 30) s += 1;
-  return s >= 5 ? 3 : s >= 3 ? 2 : s >= 1 ? 1 : 0;
+  if (hc < 50) s += 2; else if (hc < 65) s += 1;
+  if (hi > 60) s += 2; else if (hi > 45) s += 1;
+  if (ts < 52) s += 1;
+  return s >= 7 ? 3 : s >= 4 ? 2 : s >= 2 ? 1 : 0;
 }
 
 export function riskLabel(lv: number, lang: ReportLang = 'ar'): string {
@@ -364,6 +370,52 @@ export function generateActionPlan(w: WilayaRecord, year: number, lang: ReportLa
     horizon: isAr ? '12 - 36 شهراً' : isFr ? '12 - 36 mois' : '12 - 36 months',
     owner: isAr ? 'الوكالة الجزائرية لترقية الاستثمار (AAPI) + مديرية الصناعة' : isFr ? 'AAPI + Direction de l’Industrie' : 'Investment Agency (AAPI) + Industry Directorate',
     impact: isAr ? 'خلق 3,500 منصب عمل وتوسيع القاعدة الضريبية المحلية' : isFr ? 'Création d’emplois et attractivité' : 'Generate 3,500 industrial jobs & local tax revenue'
+  });
+
+  // 7. Healthcare & Hospitals (MSPRH)
+  const hc = getHealthCoverage(w);
+  const hospCount = getHospitalsCount(w);
+  plan.push({
+    priority: hc < 58 ? (isAr ? 'عاجل P1' : isFr ? 'Urgent P1' : 'Urgent P1') : (isAr ? 'متوسط P2' : isFr ? 'Moyen P2' : 'Medium P2'),
+    action: isAr
+      ? `الصحة والاستشفاء (${hc}% تغطية · ${hospCount} مستشفيات): توسيع مصالح الاستعجالات وتخصيص حصة أطباء أخصائيين وعيادات جوارية.`
+      : isFr
+      ? `Santé (${hc}% couverture · ${hospCount} hôpitaux) : renforcement des urgences, cliniques de proximité et médecins spécialistes.`
+      : `Healthcare (${hc}% coverage · ${hospCount} hospitals): expand emergency care capacity, deploy medical specialists & upgrade regional polyclinics.`,
+    horizon: isAr ? '6 - 24 شهراً' : isFr ? '6 - 24 mois' : '6 - 24 months',
+    owner: isAr ? 'وزارة الصحة (MSPRH) + مديرية الصحة والسكان (DSP)' : isFr ? 'Ministère de la Santé (MSPRH) + DSP' : 'Ministry of Health (MSPRH) + DSP',
+    impact: isAr ? 'رفع التغطية الاستشفائية بنسبة +18% وتقليص الإجلاء الطبي' : isFr ? 'Couverture sanitaire +18%' : 'Increase health coverage by +18% & cut long-distance referrals'
+  });
+
+  // 8. Natural Hazards Prevention (CRAAG & DGPC ORSEC)
+  const hi = getHazardIndex(w);
+  const srPct = Math.round(getSeismicRisk(w) * 100);
+  const wfPct = Math.round(getWildfireRisk(w) * 100);
+  plan.push({
+    priority: hi >= 60 ? (isAr ? 'عاجل P1' : isFr ? 'Urgent P1' : 'Urgent P1') : (isAr ? 'متوسط P2' : isFr ? 'Moyen P2' : 'Medium P2'),
+    action: isAr
+      ? `الأخطار الطبيعية (${hi}/100 · زلازل ${srPct}% · حرائق ${wfPct}%): تطبيق معايير البناء المضاد للزلازل RPA، شق خنادق حرائق الغابات وتحديث مخطط ORSEC.`
+      : isFr
+      ? `Risques Naturels (${hi}/100 · séisme ${srPct}% · feux ${wfPct}%) : normes parasismiques RPA, pare-feu forestiers et mise à jour ORSEC.`
+      : `Natural Hazards (${hi}/100 · seismic ${srPct}% · wildfire ${wfPct}%): enforce RPA seismic building codes, carve wildfire buffers & drill DGPC ORSEC.`,
+    horizon: isAr ? '0 - 24 شهراً' : isFr ? '0 - 24 mois' : '0 - 24 months',
+    owner: isAr ? 'مركز البحث في علم الفلك والفيزياء الفلكية (CRAAG) + الحماية المدنية (DGPC)' : isFr ? 'CRAAG + Protection Civile (DGPC)' : 'CRAAG + Civil Protection (DGPC)',
+    impact: isAr ? 'حماية الأرواح وتقليص الخسائر المادية بنسبة 35%' : isFr ? 'Réduction des pertes matérielles de 35%' : 'Cut natural disaster human & asset losses by 35%'
+  });
+
+  // 9. Transport & SNTF Rail Logistics
+  const ts = getTransportScore(w);
+  const railLinked = hasRailAccess(w);
+  plan.push({
+    priority: ts < 55 || !railLinked ? (isAr ? 'متوسط P2' : isFr ? 'Moyen P2' : 'Medium P2') : (isAr ? 'تخطيط P3' : isFr ? 'Planification P3' : 'Planning P3'),
+    action: isAr
+      ? `النقل والربط بالسكك (${ts}/100 · ${railLinked ? 'مرتبطة بـ SNTF' : 'بدون خط سكة حالياً'}): ${railLinked ? 'رفع طاقة الشحن السككي وازدواجية المحاور الطرقية الاستراتيجية.' : 'دراسة وربط الولاية بشبكة السكك الحديدية الوطنية وفك العزلة الطرقية.'}`
+      : isFr
+      ? `Transport & Rail (${ts}/100 · ${railLinked ? 'connectée SNTF' : 'non connectée rail'}) : modernisation fret ferroviaire et dédoublement routier.`
+      : `Transport & Rail (${ts}/100 · ${railLinked ? 'SNTF linked' : 'no rail link yet'}): ${railLinked ? 'expand SNTF freight capacity & dual-carriage highways.' : 'commission SNTF rail corridor extension & upgrade trunk highways.'}`,
+    horizon: isAr ? '12 - 48 شهراً' : isFr ? '12 - 48 mois' : '12 - 48 months',
+    owner: isAr ? 'وزارة النقل + الشركة الوطنية للنقل بالسكك الحديدية (SNTF)' : isFr ? 'Ministère des Transports + SNTF' : 'Ministry of Transport + SNTF Rail',
+    impact: isAr ? 'خفض تكاليف اللوجستيك بنسبة 25% وربط المناطق الداخلية بالموانئ' : isFr ? 'Coûts logistiques -25%' : 'Reduce freight logistics costs by 25% & bridge interior poles'
   });
 
   return plan;
@@ -618,6 +670,15 @@ export function filterThematicCase(wilayas: WilayaRecord[], kind: ThematicCaseKe
     } else if (kind === 'industry') {
       score = industryScore(w);
       reason = isAr ? `جاهزية صناعية: ${industryScore(w)}/100` : `Industry Score: ${industryScore(w)}/100`;
+    } else if (kind === 'health') {
+      score = getHealthCoverage(w);
+      reason = isAr ? `تغطية صحية: ${getHealthCoverage(w)}% (${getHospitalsCount(w)} مستشفى)` : `Health Coverage: ${getHealthCoverage(w)}% (${getHospitalsCount(w)} hospitals)`;
+    } else if (kind === 'hazards') {
+      score = -getHazardIndex(w);
+      reason = isAr ? `خطر طبيعي مركب: ${getHazardIndex(w)}/100` : `Hazard Index: ${getHazardIndex(w)}/100`;
+    } else if (kind === 'transport') {
+      score = getTransportScore(w);
+      reason = isAr ? `نقل وسكك: ${getTransportScore(w)}/100 ${hasRailAccess(w) ? '(SNTF)' : ''}` : `Transport Score: ${getTransportScore(w)}/100`;
     } else if (kind === 'anomaly') {
       const an = detectAnomaly(w, lang);
       score = an ? -100 : 0;
@@ -760,6 +821,9 @@ export function generateLegacyDetailedReportHtml(options: ReportGenerationOption
               <span>🏙️ +${urbanGrowth(w, targetYear)}%</span>
               <span>🏭 ${industryScore(w)}/100</span>
               <span>🛒 ${w.coverage}%</span>
+              <span>🏥 ${getHealthCoverage(w)}% (${getHospitalsCount(w)})</span>
+              <span>🌋 ${getHazardIndex(w)}/100</span>
+              <span>🚆 ${getTransportScore(w)}/100${hasRailAccess(w) ? ' ✓' : ''}</span>
             </div>
             <div class="rep-twrap">
               <table class="rep-table rep-detail">
@@ -816,15 +880,22 @@ export function generateLegacyDetailedReportHtml(options: ReportGenerationOption
       }).join('')}
     </section>
 
-    <!-- 2) Sector Deep Dives (5 Sectors) -->
+    <!-- 2) Sector Deep Dives (8 Sectors) -->
     <section class="rep-sec">
-      <h2>${isAr ? '2) التحليل القطاعي المعمّق (5 محاور استراتيجية)' : isFr ? '2) Analyse Sectorielle Approfondie' : '2) In-Depth Sector Deep Dives'}</h2>
+      <h2>${isAr ? '2) التحليل القطاعي المعمّق (8 محاور استراتيجية)' : isFr ? '2) Analyse Sectorielle Approfondie (8 Axes)' : '2) In-Depth Sector Deep Dives (8 Strategic Sectors)'}</h2>
       ${targetList.slice(0, scope === 'national' ? 4 : 6).map(w => {
         const pw = predictWater(w, targetYear);
         const cr = cropRisk(w, targetYear);
         const ug = urbanGrowth(w, targetYear);
         const cg = coverageGap(w);
         const isc = industryScore(w);
+        const hc = getHealthCoverage(w);
+        const hosp = getHospitalsCount(w);
+        const hi = getHazardIndex(w);
+        const srPct = Math.round(getSeismicRisk(w) * 100);
+        const wfPct = Math.round(getWildfireRisk(w) * 100);
+        const ts = getTransportScore(w);
+        const rail = hasRailAccess(w);
         return `
           <div class="rep-wil">
             <div class="rep-wil-head">
@@ -866,6 +937,33 @@ export function generateLegacyDetailedReportHtml(options: ReportGenerationOption
               <p>${isAr
                 ? `النقطة المركبة للجاهزية الصناعية: <b>${isc}/100</b> (الطاقة ${w.energy}، الطرق ${w.roads}، اليد العاملة ${w.labor}). ${isc > 70 ? 'موقع صناعي ممتاز مؤهل لاحتضان مشاريع استراتيجية عبر الشباك الموحد AAPI.' : 'موقع متوسط يتطلب استكمال الربط بالطاقة والطرق السريعة قبل التسويق.'}`
                 : `Industrial readiness composite score: ${isc}/100. Suitable for strategic capital deployment.`
+              }</p>
+            </div>
+            <div class="rep-sect">
+              <b>🏥 ${isAr ? 'الصحة وقدرة الاستشفاء (MSPRH)' : isFr ? 'Santé & Hôpitaux (MSPRH)' : 'Healthcare & Hospital Capacity (MSPRH)'}</b>
+              <p>${isAr
+                ? `تسجل الولاية تغطية صحية قدرها <b>${hc}%</b> عبر <b>${hosp}</b> مؤسسة استشفائية. ${hc < 60 ? 'تتطلب تعزيزاً عاجلاً بأطباء أخصائيين وتوسيع أقسام الاستعجالات والعيادات الجوارية.' : 'منظومة صحية متوازنة مع أولوية الرقمنة وتحديث التجهيز الطبي.'}`
+                : isFr
+                ? `Couverture sanitaire de <b>${hc}%</b> à travers <b>${hosp}</b> établissements hospitaliers.`
+                : `Health coverage stands at <b>${hc}%</b> across <b>${hosp}</b> public hospital facilities.`
+              }</p>
+            </div>
+            <div class="rep-sect">
+              <b>🌋 ${isAr ? 'الأخطار الطبيعية والوقاية (CRAAG / DGPC)' : isFr ? 'Risques Naturels (CRAAG / DGPC)' : 'Natural Hazards & Resilience (CRAAG / DGPC)'}</b>
+              <p>${isAr
+                ? `مؤشر الأخطار الطبيعية المركب: <b>${hi}/100</b> (الخطر الزلزالي ${srPct}%، حرائق الغابات ${wfPct}%، الفيضانات ${Math.round(w.flood * 100)}%). يُفرض التقيد الصارم بقانون البناء المضاد للزلازل RPA وخنادق حماية الغابات.`
+                : isFr
+                ? `Indice multirisques naturels : <b>${hi}/100</b> (séisme ${srPct}%, feux ${wfPct}%, crues ${Math.round(w.flood * 100)}%).`
+                : `Composite natural hazard score: <b>${hi}/100</b> (seismic ${srPct}%, wildfire ${wfPct}%, flood ${Math.round(w.flood * 100)}%). Strict RPA seismic code & DGPC readiness required.`
+              }</p>
+            </div>
+            <div class="rep-sect">
+              <b>🚆 ${isAr ? 'النقل المتعدد والسكك الحديدية (SNTF)' : isFr ? 'Transport & Rail (SNTF)' : 'Multimodal Transport & SNTF Rail'}</b>
+              <p>${isAr
+                ? `نقطة الربط اللوجستي والنقل: <b>${ts}/100</b> (${rail ? 'مرتبطة بالشبكة الوطنية للسكك الحديدية SNTF ✓' : 'غير موصولة حالياً بخط السكك الحديدية'}). الأولوية لتأمين نقل البضائع وفك العزلة نحو الأقطاب الصناعية والفلاحية.`
+                : isFr
+                ? `Score logistique & transport : <b>${ts}/100</b> (${rail ? 'connectée au rail SNTF ✓' : 'sans raccordement ferroviaire actuel'}).`
+                : `Transport connectivity index: <b>${ts}/100</b> (${rail ? 'SNTF rail-connected ✓' : 'awaiting SNTF rail extension'}).`
               }</p>
             </div>
           </div>
@@ -913,6 +1011,9 @@ export function generateLegacyDetailedReportHtml(options: ReportGenerationOption
               <th>${isAr ? 'فيضان' : 'Flood'}</th>
               <th>${isAr ? 'جفاف فلاحي' : 'Drought'}</th>
               <th>${isAr ? 'فجوة تموين' : 'Retail Gap'}</th>
+              <th>${isAr ? 'صحة' : 'Health'}</th>
+              <th>${isAr ? 'أخطار' : 'Hazards'}</th>
+              <th>${isAr ? 'نقل' : 'Transp.'}</th>
               <th>${isAr ? 'درجة الخطر' : 'Risk Level'}</th>
               <th>🤖 ${isAr ? 'الشذوذات المرصودة' : 'Detected Anomalies'}</th>
             </tr>
@@ -932,6 +1033,9 @@ export function generateLegacyDetailedReportHtml(options: ReportGenerationOption
                   <td>${Math.round(w.flood * 100)}%</td>
                   <td>${cr}%</td>
                   <td>${cg}%</td>
+                  <td>${getHealthCoverage(w)}%</td>
+                  <td>${getHazardIndex(w)}</td>
+                  <td>${getTransportScore(w)}</td>
                   <td><span class="rep-risk r${lv}">${riskLabel(lv, lang)}</span></td>
                   <td><small>${anom || '—'}</small></td>
                 </tr>
@@ -995,6 +1099,9 @@ export function generateLegacyDetailedReportHtml(options: ReportGenerationOption
               <th>+${isAr ? 'عمران' : 'Urban'}%</th>
               <th>${isAr ? 'فيضان' : 'Flood'}</th>
               <th>${isAr ? 'صناعة' : 'Ind'}/100</th>
+              <th>${isAr ? 'صحة' : 'Health'}%</th>
+              <th>${isAr ? 'أخطار' : 'Hazard'}</th>
+              <th>${isAr ? 'نقل' : 'Transp.'}</th>
               <th>${isAr ? 'التقييم' : 'Risk'}</th>
             </tr>
           </thead>
@@ -1009,6 +1116,9 @@ export function generateLegacyDetailedReportHtml(options: ReportGenerationOption
                 <td>+${urbanGrowth(w, targetYear)}%</td>
                 <td>${Math.round(w.flood * 100)}%</td>
                 <td>${industryScore(w)}</td>
+                <td>${getHealthCoverage(w)}%</td>
+                <td>${getHazardIndex(w)}</td>
+                <td>${getTransportScore(w)}${hasRailAccess(w) ? ' 🚆' : ''}</td>
                 <td><span class="rep-risk r${riskOf(w, targetYear)}">${riskLabel(riskOf(w, targetYear), lang)}</span></td>
               </tr>
             `).join('')}
@@ -1022,8 +1132,8 @@ export function generateLegacyDetailedReportHtml(options: ReportGenerationOption
       <h2>${isAr ? '7) المنهجية العلمية والمصادر الرسمية والاعتماد' : isFr ? '7) Méthodologie, Sources & Validation' : '7) Methodology, Data Sources & Official Endorsement'}</h2>
       <p>
         ${isAr
-          ? 'نماذج استشرافية حسابية: معادلة استهلاك المياه (+3.5% سنوياً مع النمو السكاني، وتناقص تساقط الأمطار بمعدل −1.2% سنوياً). معادلة خطر الجفاف عبر تكامل مؤشرات التربة والتساقط وNDVI (+2.1 نقطة سنوياً). التوسع العمراني محسوب عبر دالة هيدرولوجية وعقارية (السكان × الأسعار). مصادر البيانات الإحصائية الرسمية: الديوان الوطني للإحصائيات (ONS)، الوكالة الوطنية للموارد المائية (ANRH)، الديوان الوطني للأرصاد الجوية (ONM)، ومديريات المصالح الفلاحية (DSA). يُوصى بمراجعة وتحديث التقرير ربع سنوياً.'
-          : 'Algorithmic forecasting models: water demand (+3.5%/year with population growth, precipitation decline −1.2%/year). Crop drought risk integrated via soil, rainfall, and NDVI (+2.1 pts/year). Urban sprawl computed via demographic density and real estate dynamics. Official sources: ONS, ANRH, ONM, DSA. Quarterly executive review recommended.'
+          ? 'نماذج استشرافية حسابية لـ 21 مؤشراً عبر 8 محاور استراتيجية: معادلة استهلاك المياه (+3.5% سنوياً مع النمو السكاني، وتناقص تساقط الأمطار بمعدل −1.2% سنوياً)، خطر الجفاف (+2.1 نقطة سنوياً)، التوسع العمراني، بالإضافة إلى تغطية الصحة (MSPRH)، الأخطار الطبيعية المركبة (CRAAG & DGPC)، وشبكات النقل والسكك (SNTF). مصادر البيانات الرسمية: الديوان الوطني للإحصائيات (ONS)، ANRH، ONM، DSA، MSPRH، CRAAG، وSNTF. يُوصى بمراجعة وتحديث التقرير ربع سنوياً.'
+          : 'Algorithmic forecasting across 21 indicators and 8 strategic sectors: water demand (+3.5%/yr, rainfall decline −1.2%/yr), crop drought (+2.1 pts/yr), urban sprawl, MSPRH healthcare access, CRAAG/DGPC multi-hazard index, and SNTF multimodal rail connectivity. Official sources: ONS, ANRH, ONM, DSA, MSPRH, CRAAG, SNTF.'
         }
       </p>
       <div class="rep-sign">
@@ -1278,8 +1388,8 @@ export function generateModernForesightReportHtml(options: ReportGenerationOptio
           </div>
           <div style="margin-top:6px; font-size:12px; font-weight:bold; color:#0369A1;">
             ${isAr
-              ? `أفق ${targetYear}: العجز المائي (${imp.waterDeficit}) | خطر الجفاف (${imp.droughtRiskPct}%) | التوسع العمراني (+${imp.urbanGrowthPct}%) | الجاهزية الصناعية (${imp.industrialCapacityIndex}/100)`
-              : `Horizon ${targetYear}: Deficit (${imp.waterDeficit}) | Drought (${imp.droughtRiskPct}%) | Urban Growth (+${imp.urbanGrowthPct}%) | Industry (${imp.industrialCapacityIndex}/100)`
+              ? `أفق ${targetYear}: العجز المائي (${imp.waterDeficit}) | الجفاف (${imp.droughtRiskPct}%) | العمران (+${imp.urbanGrowthPct}%) | الصناعة (${imp.industrialCapacityIndex}/100) | الصحة (${imp.healthCoveragePct}%) | الأخطار (${imp.hazardRiskScore}/100) | النقل (${imp.transportConnectivityScore}/100)`
+              : `Horizon ${targetYear}: Deficit (${imp.waterDeficit}) | Drought (${imp.droughtRiskPct}%) | Urban (+${imp.urbanGrowthPct}%) | Industry (${imp.industrialCapacityIndex}/100) | Health (${imp.healthCoveragePct}%) | Hazards (${imp.hazardRiskScore}/100) | Transport (${imp.transportConnectivityScore}/100)`
             }
           </div>
         </div>
@@ -1669,6 +1779,9 @@ function getCaseTitleAr(k: ThematicCaseKey): string {
     case 'retail': return '🛒 فجوة تجارية وتموينية';
     case 'flood': return '🌊 فيضانات ومضاربة عقارية';
     case 'industry': return '🏭 جاهزية صناعية واستثمار';
+    case 'health': return '🏥 فجوة التغطية الصحية والمستشفيات';
+    case 'hazards': return '🌋 بؤر الأخطار الطبيعية (زلازل/حرائق/سيول)';
+    case 'transport': return '🚆 النقل المتعدد والربط بالسكك SNTF';
     case 'anomaly': return '⚠️ شذوذات إحصائية مرصودة بالذكاء الاصطناعي';
     default: return 'حالة موضوعاتية';
   }
@@ -1720,6 +1833,13 @@ export function downloadWilayasCsv(
     `Crop_Drought_Risk_${targetYear}_Pct`,
     `Projected_Urban_Growth_${targetYear}_Pct`,
     'Industry_Score_100',
+    'Hospitals_Count',
+    'Health_Coverage_Pct',
+    'Seismic_Risk_Pct',
+    'Wildfire_Risk_Pct',
+    'Natural_Hazard_Index_100',
+    'Transport_Connectivity_100',
+    'SNTF_Rail_Access',
     `Risk_Level_${targetYear}`
   ];
 
@@ -1749,6 +1869,13 @@ export function downloadWilayasCsv(
     cropRisk(w, targetYear),
     urbanGrowth(w, targetYear),
     industryScore(w),
+    getHospitalsCount(w),
+    getHealthCoverage(w),
+    Math.round(getSeismicRisk(w) * 100),
+    Math.round(getWildfireRisk(w) * 100),
+    getHazardIndex(w),
+    getTransportScore(w),
+    hasRailAccess(w) ? 'TRUE' : 'FALSE',
     `"${riskLabel(riskOf(w, targetYear), 'en')}"`
   ]);
 

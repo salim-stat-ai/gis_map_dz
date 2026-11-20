@@ -78,7 +78,9 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
   const [hotspotFilter, setHotspotFilter] = useState<'all' | 'hot' | 'cold'>('all');
   const [hotspotSearch, setHotspotSearch] = useState<string>('');
 
-  const [regDepVar, setRegDepVar] = useState<'waterDef' | 'price' | 'industry' | 'coverage'>('waterDef');
+  const [regDepVar, setRegDepVar] = useState<
+    'waterDef' | 'price' | 'industry' | 'coverage' | 'healthCoverage' | 'hazardIndex' | 'transportScore'
+  >('waterDef');
 
   const [kdeBandwidthKm, setKdeBandwidthKm] = useState<number>(140);
   const [interpMethod, setInterpMethod] = useState<'Kriging' | 'IDW'>('Kriging');
@@ -91,13 +93,16 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
   const [selectedRegionId, setSelectedRegionId] = useState<string>('all');
 
   const [ahpWeights, setAhpWeights] = useState({
-    water: 30,
-    roads: 20,
-    energy: 15,
+    water: 20,
+    roads: 15,
+    energy: 10,
     labor: 10,
     soil: 10,
     coverage: 5,
-    price: 10
+    price: 5,
+    health: 10,
+    hazardSafety: 10,
+    transport: 5
   });
 
   // Chart refs
@@ -178,7 +183,10 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
       { id: 'labor', name: 'Active Workforce', nameAr: 'اليد العاملة', weight: ahpWeights.labor },
       { id: 'soil', name: 'Soil Fertility', nameAr: 'خصوبة التربة', weight: ahpWeights.soil },
       { id: 'coverage', name: 'Market Coverage', nameAr: 'التغطية التجارية', weight: ahpWeights.coverage },
-      { id: 'price', name: 'Land Price Affordability', nameAr: 'تنافسية العقار', weight: ahpWeights.price }
+      { id: 'price', name: 'Land Price Affordability', nameAr: 'تنافسية العقار', weight: ahpWeights.price },
+      { id: 'health', name: 'Healthcare Readiness', nameAr: 'الجاهزية الصحية', weight: ahpWeights.health },
+      { id: 'hazardSafety', name: 'Natural Hazard Safety', nameAr: 'الأمان من الأخطار', weight: ahpWeights.hazardSafety },
+      { id: 'transport', name: 'Rail & Multimodal Transport', nameAr: 'السكك والنقل', weight: ahpWeights.transport }
     ],
     [ahpWeights]
   );
@@ -186,16 +194,33 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
 
   const handleMetricSelect = (m: SpatialMetricKey) => {
     setActiveSpatialMetric(m);
-    if (m === 'waterDef' || m === 'price' || m === 'industry' || m === 'coverage') {
+    if (
+      m === 'waterDef' ||
+      m === 'price' ||
+      m === 'industry' ||
+      m === 'coverage' ||
+      m === 'healthCoverage' ||
+      m === 'hazardIndex' ||
+      m === 'transportScore'
+    ) {
       setRegDepVar(m);
     }
   };
 
-  const applyAhpPreset = (preset: 'balanced' | 'industry' | 'agri' | 'commerce') => {
-    if (preset === 'industry') setAhpWeights({ water: 15, roads: 25, energy: 25, labor: 15, soil: 5, coverage: 5, price: 10 });
-    else if (preset === 'agri') setAhpWeights({ water: 35, roads: 10, energy: 10, labor: 10, soil: 25, coverage: 5, price: 5 });
-    else if (preset === 'commerce') setAhpWeights({ water: 10, roads: 30, energy: 10, labor: 15, soil: 5, coverage: 20, price: 10 });
-    else setAhpWeights({ water: 30, roads: 20, energy: 15, labor: 10, soil: 10, coverage: 5, price: 10 });
+  const applyAhpPreset = (preset: 'balanced' | 'industry' | 'agri' | 'commerce' | 'health' | 'transport') => {
+    if (preset === 'industry') {
+      setAhpWeights({ water: 10, roads: 15, energy: 20, labor: 10, soil: 5, coverage: 5, price: 5, health: 5, hazardSafety: 10, transport: 15 });
+    } else if (preset === 'agri') {
+      setAhpWeights({ water: 30, roads: 10, energy: 5, labor: 10, soil: 25, coverage: 5, price: 5, health: 0, hazardSafety: 5, transport: 5 });
+    } else if (preset === 'commerce') {
+      setAhpWeights({ water: 5, roads: 20, energy: 5, labor: 10, soil: 5, coverage: 20, price: 10, health: 5, hazardSafety: 5, transport: 15 });
+    } else if (preset === 'health') {
+      setAhpWeights({ water: 10, roads: 10, energy: 10, labor: 10, soil: 0, coverage: 5, price: 5, health: 30, hazardSafety: 15, transport: 5 });
+    } else if (preset === 'transport') {
+      setAhpWeights({ water: 5, roads: 25, energy: 5, labor: 5, soil: 0, coverage: 10, price: 5, health: 5, hazardSafety: 10, transport: 30 });
+    } else {
+      setAhpWeights({ water: 20, roads: 15, energy: 10, labor: 10, soil: 10, coverage: 5, price: 5, health: 10, hazardSafety: 10, transport: 5 });
+    }
   };
 
   // Filtered hotspots list
@@ -603,7 +628,10 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
       labor: '#A78BFA',
       soil: '#84CC16',
       coverage: '#06B6D4',
-      price: '#F43F5E'
+      price: '#F43F5E',
+      health: '#FB7185',
+      hazardSafety: '#F97316',
+      transport: '#22D3EE'
     };
 
     ahpChartInst.current = new ChartJS(ahpChartRef.current, {
@@ -1012,6 +1040,9 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
                   <option value="price">{isAr ? 'المتغير التابع: أسعار العقار' : 'Dep: Real Estate Price'}</option>
                   <option value="industry">{isAr ? 'المتغير التابع: الجاذبية الصناعية' : 'Dep: Industry Index'}</option>
                   <option value="coverage">{isAr ? 'المتغير التابع: التغطية التجارية' : 'Dep: Retail Coverage'}</option>
+                  <option value="healthCoverage">{isAr ? 'المتغير التابع: التغطية الصحية' : 'Dep: Healthcare Coverage'}</option>
+                  <option value="hazardIndex">{isAr ? 'المتغير التابع: الأخطار الطبيعية' : 'Dep: Natural Hazard Index'}</option>
+                  <option value="transportScore">{isAr ? 'المتغير التابع: النقل والسكك' : 'Dep: Transport & Rail Score'}</option>
                 </select>
                 <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs px-3 py-1.5 rounded-lg font-mono font-bold">
                   ρ = {spatialReg.rho}
@@ -1586,13 +1617,13 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
                   {isAr ? 'التحليل المكاني متعدد المعايير لاختيار مواقع الاستثمار (AHP Suitability MCDA)' : 'AHP Multi-Criteria Spatial Decision & Suitability Engine'}
                 </h2>
                 <span className="text-xs text-slate-400">
-                  {isAr ? 'تخصيص 7 معايير استراتيجية مع قوالب جاهزة وتدقيق نسبة الاتساق CR' : '7 dynamic weights, sector presets, stacked criterion breakdown & Saaty CR check'}
+                  {isAr ? 'تخصيص 10 معايير استراتيجية (بما فيها الصحة والأمان من الأخطار والنقل) مع تدقيق الاتساق CR' : '10 dynamic weights (incl. Health, Hazard Safety & Rail), sector presets & Saaty CR check'}
                 </span>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1 bg-[#121F3D] p-1 rounded-lg border border-white/10 text-[11px]">
+              <div className="flex flex-wrap items-center gap-1 bg-[#121F3D] p-1 rounded-lg border border-white/10 text-[11px]">
                 <button type="button" onClick={() => applyAhpPreset('balanced')} className="px-2 py-1 rounded hover:bg-white/10 text-slate-200 cursor-pointer">
                   {isAr ? 'متوازن' : 'Balanced'}
                 </button>
@@ -1605,6 +1636,12 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
                 <button type="button" onClick={() => applyAhpPreset('commerce')} className="px-2 py-1 rounded hover:bg-white/10 text-amber-300 cursor-pointer">
                   {isAr ? 'تمويني' : 'Logistics'}
                 </button>
+                <button type="button" onClick={() => applyAhpPreset('health')} className="px-2 py-1 rounded hover:bg-white/10 text-rose-300 cursor-pointer">
+                  {isAr ? 'صحي' : 'Health'}
+                </button>
+                <button type="button" onClick={() => applyAhpPreset('transport')} className="px-2 py-1 rounded hover:bg-white/10 text-cyan-300 cursor-pointer">
+                  {isAr ? 'نقل وسكك' : 'Transit/Rail'}
+                </button>
               </div>
 
               <span className={`text-xs px-2.5 py-1 rounded font-bold flex items-center gap-1.5 ${
@@ -1616,8 +1653,8 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
             </div>
           </div>
 
-          {/* 7 Criteria Sliders */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 bg-[#101D38] p-3.5 rounded-xl border border-white/5">
+          {/* 10 Criteria Sliders */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 bg-[#101D38] p-3.5 rounded-xl border border-white/5">
             {([
               { id: 'water', label: isAr ? '💧 المياه' : '💧 Water', color: 'accent-sky-400 text-sky-400' },
               { id: 'roads', label: isAr ? '🛣️ الطرق' : '🛣️ Roads', color: 'accent-emerald-400 text-emerald-400' },
@@ -1625,7 +1662,10 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
               { id: 'labor', label: isAr ? '👥 العمالة' : '👥 Labor', color: 'accent-purple-400 text-purple-400' },
               { id: 'soil', label: isAr ? '🌱 التربة' : '🌱 Soil', color: 'accent-lime-400 text-lime-400' },
               { id: 'coverage', label: isAr ? '🛒 التغطية' : '🛒 Coverage', color: 'accent-cyan-400 text-cyan-400' },
-              { id: 'price', label: isAr ? '🏷️ العقار' : '🏷️ Land', color: 'accent-rose-400 text-rose-400' }
+              { id: 'price', label: isAr ? '🏷️ العقار' : '🏷️ Land', color: 'accent-rose-400 text-rose-400' },
+              { id: 'health', label: isAr ? '🏥 الصحة' : '🏥 Health', color: 'accent-pink-400 text-pink-400' },
+              { id: 'hazardSafety', label: isAr ? '🛡️ الأمان (أخطار)' : '🛡️ Hazard Safety', color: 'accent-orange-400 text-orange-400' },
+              { id: 'transport', label: isAr ? '🚆 النقل والسكك' : '🚆 Rail/Transit', color: 'accent-teal-400 text-teal-400' }
             ] as const).map(item => (
               <div key={item.id}>
                 <div className="flex justify-between text-xs mb-1">
@@ -1634,8 +1674,8 @@ export const SpatialAnalysisLab: React.FC<SpatialAnalysisLabProps> = ({
                 </div>
                 <input
                   type="range"
-                  min="5"
-                  max="70"
+                  min="0"
+                  max="60"
                   step="5"
                   value={ahpWeights[item.id]}
                   onChange={(e) => setAhpWeights({ ...ahpWeights, [item.id]: Number(e.target.value) })}

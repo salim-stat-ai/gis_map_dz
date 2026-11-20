@@ -8,7 +8,18 @@
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { WilayaRecord } from '../types';
-import { predictWater, cropRisk, urbanGrowth } from './reporting';
+import {
+  predictWater,
+  cropRisk,
+  urbanGrowth,
+  getHospitalsCount,
+  getHealthCoverage,
+  getSeismicRisk,
+  getWildfireRisk,
+  getHazardIndex,
+  getTransportScore,
+  hasRailAccess
+} from './reporting';
 
 export interface ImportField {
   k: keyof WilayaRecord | string;
@@ -36,6 +47,13 @@ export const IMPORT_FIELDS: ImportField[] = [
   { k: 'roads', label: 'Roads', labelAr: 'شبكة الطرق /100', aliases: ['roads', 'routes', 'road_network', 'connectivity'] },
   { k: 'labor', label: 'Labor', labelAr: 'اليد العاملة /100', aliases: ['labor', 'mainoeuvre', 'emploi', 'workforce'] },
   { k: 'industry', label: 'Industry', labelAr: 'القدرة الصناعية /100', aliases: ['industry', 'industrie', 'factories', 'industrial_score'] },
+  { k: 'hospitals', label: 'Hospitals', labelAr: 'المستشفيات والمرافق', aliases: ['hospitals', 'hopitaux', 'chu', 'eph', 'health_facilities'] },
+  { k: 'healthCoverage', label: 'Health Access %', labelAr: 'التغطية الصحية %', aliases: ['healthcoverage', 'health_coverage', 'sante', 'health_access', 'couverture_sanitaire'] },
+  { k: 'seismicRisk', label: 'Seismic Risk 0-1', labelAr: 'الخطر الزلزالي 0-1', aliases: ['seismicrisk', 'seismic_risk', 'seisme', 'earthquake'] },
+  { k: 'wildfireRisk', label: 'Wildfire Risk 0-1', labelAr: 'خطر الحرائق 0-1', aliases: ['wildfirerisk', 'wildfire_risk', 'incendie', 'forest_fire'] },
+  { k: 'hazardIndex', label: 'Hazard Index /100', labelAr: 'مؤشر الأخطار /100', aliases: ['hazardindex', 'hazard_index', 'multirisques', 'natural_hazards'] },
+  { k: 'transportScore', label: 'Transport /100', labelAr: 'مؤشر النقل والسكك /100', aliases: ['transportscore', 'transport_score', 'transport', 'multimodal_transport'] },
+  { k: 'railAccess', label: 'Rail Access (0/1)', labelAr: 'ربط السكة الحديدية', aliases: ['railaccess', 'rail_access', 'sntf', 'rail', 'railway'] }
 ];
 
 export interface PresetSource {
@@ -76,6 +94,15 @@ export const IMPORT_PRESETS: PresetSource[] = [
     url: 'https://overpass-api.de/api/interpreter?data=%5Bout%3Ajson%5D%3Bnode%5B%22amenity%22%3D%22hospital%22%5D%2836.6%2C2.9%2C36.9%2C3.3%29%3Bout+40%3B',
     formatHint: 'json',
     description: 'Overpass query for healthcare infrastructure in Algiers metro area.'
+  },
+  {
+    id: 'osm-rail',
+    name: 'OSM — railway stations & SNTF network (Overpass)',
+    nameAr: 'OSM — محطات وشبكة السكك الحديدية الجزائرية (SNTF)',
+    group: 'algeria',
+    url: 'https://overpass-api.de/api/interpreter?data=%5Bout%3Ajson%5D%3Barea%5B%22ISO3166-1%22%3D%22DZ%22%5D%3Bnode%5B%22railway%22%3D%22station%22%5D%28area%29%3Bout+50%3B',
+    formatHint: 'json',
+    description: 'OpenStreetMap query for SNTF railway hubs and transport interchanges.'
   },
   {
     id: 'ons-economy',
@@ -457,7 +484,7 @@ export function downloadBlob(blob: Blob, fileName: string) {
 
 export function downloadCsvTemplate() {
   const headers = IMPORT_FIELDS.map(f => f.aliases[0]).join(',');
-  const exampleRow = 'Setif,36.19,5.41,1800,95000,0.15,82,450,0.55,3,900,-12,48,78,80,88,82,70';
+  const exampleRow = 'Setif,36.19,5.41,1800,95000,0.15,82,450,0.55,3,900,-12,48,78,80,88,82,70,24,78,0.68,0.34,42,84,1';
   const csvContent = '\uFEFF' + headers + '\n' + exampleRow + '\n';
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
   downloadBlob(blob, 'gis_map-template.csv');
@@ -493,6 +520,13 @@ export function exportDatasetAsCsv(wilayas: WilayaRecord[], targetYear: number =
     roads: w.roads,
     labor: w.labor,
     industry: w.industry,
+    hospitals: getHospitalsCount(w),
+    health_coverage_pct: getHealthCoverage(w),
+    seismic_risk: getSeismicRisk(w),
+    wildfire_risk: getWildfireRisk(w),
+    hazard_index: getHazardIndex(w),
+    transport_score: getTransportScore(w),
+    rail_access: hasRailAccess(w) ? 1 : 0,
     forecast_water_2030: predictWater(w, targetYear),
     drought_risk_2030: cropRisk(w, targetYear),
     urban_growth_2030: urbanGrowth(w, targetYear)
@@ -527,6 +561,13 @@ export function exportDatasetAsExcel(wilayas: WilayaRecord[], targetYear: number
     'Road Network (/100)': w.roads,
     'Labor Workforce (/100)': w.labor,
     'Industrial Capacity (/100)': w.industry,
+    'Hospitals Count': getHospitalsCount(w),
+    'Health Coverage (%)': getHealthCoverage(w),
+    'Seismic Risk (0-1)': getSeismicRisk(w),
+    'Wildfire Risk (0-1)': getWildfireRisk(w),
+    'Natural Hazard Index (/100)': getHazardIndex(w),
+    'Transport & Rail Score (/100)': getTransportScore(w),
+    'SNTF Rail Connected': hasRailAccess(w) ? 'Yes' : 'No',
     [`Forecast Water Deficit ${targetYear}`]: predictWater(w, targetYear),
     [`Drought Risk ${targetYear}`]: cropRisk(w, targetYear),
     [`Urban Growth ${targetYear}`]: urbanGrowth(w, targetYear)
@@ -568,6 +609,13 @@ export function exportDatasetAsGeoJson(wilayas: WilayaRecord[], targetYear: numb
         roads: w.roads,
         labor: w.labor,
         industry: w.industry,
+        hospitals: getHospitalsCount(w),
+        healthCoverage: getHealthCoverage(w),
+        seismicRisk: getSeismicRisk(w),
+        wildfireRisk: getWildfireRisk(w),
+        hazardIndex: getHazardIndex(w),
+        transportScore: getTransportScore(w),
+        railAccess: hasRailAccess(w),
         forecast_water: predictWater(w, targetYear),
         drought_risk: cropRisk(w, targetYear),
         urban_growth: urbanGrowth(w, targetYear)
@@ -586,9 +634,12 @@ export function exportDatasetAsKml(wilayas: WilayaRecord[], targetYear: number =
     const fWater = predictWater(w, targetYear);
     const dRisk = cropRisk(w, targetYear);
     const uGrowth = urbanGrowth(w, targetYear);
+    const healthCov = getHealthCoverage(w);
+    const hazardIdx = getHazardIndex(w);
+    const transportIdx = getTransportScore(w);
     return `<Placemark>
   <name>${w.en} (${w.n})</name>
-  <description>Water Deficit: ${w.waterDef} m3 | Soil: ${w.soil}/100 | Rain: ${w.rain} mm | Forecast ${targetYear}: ${fWater}</description>
+  <description>Water Deficit: ${w.waterDef} | Health: ${healthCov}% | Hazard: ${hazardIdx}/100 | Transport: ${transportIdx}/100 | Forecast ${targetYear}: ${fWater}</description>
   <Point><coordinates>${w.lon},${w.lat}</coordinates></Point>
   <ExtendedData>
     <Data name="code"><value>${w.num}</value></Data>
@@ -598,6 +649,9 @@ export function exportDatasetAsKml(wilayas: WilayaRecord[], targetYear: number =
     <Data name="rain"><value>${w.rain}</value></Data>
     <Data name="soil"><value>${w.soil}</value></Data>
     <Data name="ndvi"><value>${w.ndvi}</value></Data>
+    <Data name="healthCoverage"><value>${healthCov}</value></Data>
+    <Data name="hazardIndex"><value>${hazardIdx}</value></Data>
+    <Data name="transportScore"><value>${transportIdx}</value></Data>
     <Data name="forecast_water_${targetYear}"><value>${fWater}</value></Data>
     <Data name="drought_risk_${targetYear}"><value>${dRisk}</value></Data>
     <Data name="urban_growth_${targetYear}"><value>${uGrowth}</value></Data>
@@ -619,6 +673,13 @@ export function exportDatasetAsKml(wilayas: WilayaRecord[], targetYear: number =
 export function exportDatasetAsJson(wilayas: WilayaRecord[], targetYear: number = 2030) {
   const data = wilayas.map(w => ({
     ...w,
+    hospitals: getHospitalsCount(w),
+    healthCoverage: getHealthCoverage(w),
+    seismicRisk: getSeismicRisk(w),
+    wildfireRisk: getWildfireRisk(w),
+    hazardIndex: getHazardIndex(w),
+    transportScore: getTransportScore(w),
+    railAccess: hasRailAccess(w),
     forecastWaterDeficit2030: predictWater(w, targetYear),
     droughtRisk2030: cropRisk(w, targetYear),
     urbanGrowth2030: urbanGrowth(w, targetYear)

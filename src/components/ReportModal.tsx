@@ -315,6 +315,9 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                     <option value="retail">{isAr ? '🛒 فجوة تجارية وتموينية' : isFr ? 'Déficit Commercial' : 'Retail Gap'}</option>
                     <option value="flood">{isAr ? '🌊 فيضانات ومضاربة عقار' : isFr ? 'Inondations & Foncier' : 'Floods & Speculation'}</option>
                     <option value="industry">{isAr ? '🏭 جاهزية صناعية واستثمار' : isFr ? 'Potentiel Industriel' : 'Industry Readiness'}</option>
+                    <option value="health">{isAr ? '🏥 الصحة والمستشفيات' : isFr ? 'Santé & Hôpitaux' : 'Healthcare & Hospitals'}</option>
+                    <option value="hazards">{isAr ? '🌋 الأخطار الطبيعية' : isFr ? 'Risques Naturels' : 'Natural Hazards'}</option>
+                    <option value="transport">{isAr ? '🚆 النقل والسكك SNTF' : isFr ? 'Transport & Rail SNTF' : 'Transport & SNTF Rail'}</option>
                     <option value="anomaly">{isAr ? '⚠️ شذوذات إحصائية بالذكاء' : isFr ? 'Anomalies IA' : 'AI Anomalies'}</option>
                   </select>
                 </div>

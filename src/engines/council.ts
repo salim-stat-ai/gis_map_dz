@@ -8,6 +8,15 @@ import { CouncilConsensusResult, WilayaRecord } from '../types';
 import { AI_AGENT_PROFILES } from './agents';
 import { computeMoransI, computeGetisOrdGi, haversineDistance } from './gis';
 import { executeForecastModel } from './quantitative';
+import {
+  getHospitalsCount,
+  getHealthCoverage,
+  getSeismicRisk,
+  getWildfireRisk,
+  getHazardIndex,
+  getTransportScore,
+  hasRailAccess
+} from './reporting';
 
 function findNearestWilaya(target: WilayaRecord, allWilayas: WilayaRecord[]): { peer: WilayaRecord; distKm: number } {
   let peer = target;
@@ -61,8 +70,15 @@ export function conveneAiCouncil(
     )
   );
   const industryScore = Math.round(
-    targetWilaya.energy * 0.3 + targetWilaya.roads * 0.3 + targetWilaya.labor * 0.2 + (100 - Math.abs(targetWilaya.waterDef)) * 0.2
+    targetWilaya.energy * 0.28 + getTransportScore(targetWilaya) * 0.32 + targetWilaya.labor * 0.2 + (100 - Math.abs(targetWilaya.waterDef)) * 0.2
   );
+  const healthCov = getHealthCoverage(targetWilaya);
+  const hospitalsCnt = getHospitalsCount(targetWilaya);
+  const hazardIdx = getHazardIndex(targetWilaya);
+  const seismicPct = Math.round(getSeismicRisk(targetWilaya) * 100);
+  const wildfirePct = Math.round(getWildfireRisk(targetWilaya) * 100);
+  const transportSc = getTransportScore(targetWilaya);
+  const railLinked = hasRailAccess(targetWilaya);
 
   // Data Quality Audit calibrated to targetWilaya
   const hasHistory = (targetWilaya.historicalWaterDef?.length ?? 0) >= 6;
@@ -71,10 +87,13 @@ export function conveneAiCouncil(
   const stdW = Math.sqrt(histWater.reduce((s, v) => s + Math.pow(v - meanW, 2), 0) / Math.max(1, histWater.length));
   const varianceCoeff = Math.round((stdW / Math.max(1, Math.abs(meanW))) * 100) / 100;
 
-  // Dynamic Consensus Priorities sorted by targetWilaya's actual severity
+  // Dynamic Consensus Priorities sorted by targetWilaya's actual severity across all 8 layers
   const waterWeight = Math.min(98, Math.round(52 + Math.max(0, -targetWilaya.waterDef) * 1.15 + (targetWilaya.dams === 0 ? 8 : 0)));
   const floodWeight = Math.min(97, Math.round(35 + floodPct * 1.25));
-  const droughtWeight = Math.min(96, Math.round(30 + droughtPct * 0.85));
+  const hazardWeight = Math.min(98, Math.round(34 + hazardIdx * 0.92));
+  const healthWeight = Math.min(96, Math.round(34 + (100 - healthCov) * 1.12));
+  const droughtWeight = Math.min(95, Math.round(30 + droughtPct * 0.85));
+  const transportWeight = Math.min(95, Math.round(30 + (100 - transportSc) * 1.05 + (railLinked ? 0 : 10)));
   const commerceWeight = Math.min(94, Math.round(28 + gapPct * 1.15 + (100 - targetWilaya.roads) * 0.25));
 
   const consensusPriorities = [
@@ -90,16 +109,36 @@ export function conveneAiCouncil(
     },
     {
       rank: 2,
-      title: `Spatial Flood Zoning & PDAU Freeze in ${targetWilaya.en} (${floodPct}% Wadi Overlap)`,
-      titleAr: `التهيئة العمرانية الوقائية وتجميد البناء في أودية ${targetWilaya.n} (تعرض ${floodPct}%)`,
-      supportingAgents: ['Muse Spark (Map Analyst)', 'Claude (Policy Advisor)'],
-      weightScore: floodWeight,
+      title: `Healthcare Infrastructure & Hospital Capacity in ${targetWilaya.en} (${healthCov}% Access, ${hospitalsCnt} Hospitals)`,
+      titleAr: `تعزيز المنظومة الصحية وقدرة الاستشفاء في ${targetWilaya.n} (تغطية ${healthCov}%، ${hospitalsCnt} مستشفى)`,
+      supportingAgents: ['Gemini (Crisis)', 'Claude (Policy Advisor)', 'Grok (Anomaly Watch)'],
+      weightScore: healthWeight,
       rationale: isAr
-        ? `تقاطع النسيج العمراني في ${targetWilaya.n} مع الأودية يبلغ ${floodPct}% مع سعر عقار ${targetWilaya.price.toLocaleString()} دج/م² وسكان ${targetWilaya.pop} ألف نسمة، ما يستوجب ضبط التوسع نحو الهضاب الآمنة.`
-        : `${targetWilaya.en} carries ${floodPct}% flood-corridor overlap alongside land costs of ${targetWilaya.price.toLocaleString()} DZD/m² and ${targetWilaya.pop}k residents, requiring targeted PDAU zoning alignment.`
+        ? `تبلغ التغطية الصحية في ${targetWilaya.n} نحو ${healthCov}% عبر ${hospitalsCnt} مستشفى لكتلة سكانية تبلغ ${targetWilaya.pop} ألف نسمة، ما يستوجب ترقية مصالح الاستعجالات وفك العزلة الصحية للبلديات.`
+        : `${targetWilaya.en} records ${healthCov}% healthcare access across ${hospitalsCnt} hospitals serving ${targetWilaya.pop}k residents, requiring targeted emergency ward & clinic deployment.`
     },
     {
       rank: 3,
+      title: `Multi-Hazard Shield: Seismic (${seismicPct}%), Flood (${floodPct}%) & Wildfire (${wildfirePct}%) in ${targetWilaya.en}`,
+      titleAr: `الوقاية من الأخطار الطبيعية في ${targetWilaya.n}: زلازل ${seismicPct}%، سيول ${floodPct}%، حرائق ${wildfirePct}% (${hazardIdx}/100)`,
+      supportingAgents: ['Muse Spark (Map Analyst)', 'Gemini (Crisis)', 'Claude (Policy Advisor)'],
+      weightScore: Math.max(hazardWeight, floodWeight),
+      rationale: isAr
+        ? `يسجل مؤشر الأخطار الطبيعية المركب ${hazardIdx}/100 بتقاطع التوسع العمراني مع الأودية (${floodPct}%) والنشاط الزلزالي RPA (${seismicPct}%)، مما يفرض تجميد البناء في المناطق الحساسة.`
+        : `Composite hazard index stands at ${hazardIdx}/100 (seismic ${seismicPct}%, wadi flood ${floodPct}%, wildfire ${wildfirePct}%), mandating strict RPA building codes & PDAU setbacks.`
+    },
+    {
+      rank: 4,
+      title: `Multimodal Transport & SNTF Rail Corridor in ${targetWilaya.en} (${transportSc}/100)`,
+      titleAr: `تطوير النقل متعدد الوسائط وربط السكك الحديدية لـ ${targetWilaya.n} (${transportSc}/100${railLinked ? ' — متصل بـ SNTF' : ''})`,
+      supportingAgents: ['DeepSeek (Reasoner)', 'Muse Spark (Map Analyst)', 'ChatGPT (Foresight)'],
+      weightScore: transportWeight,
+      rationale: isAr
+        ? `تصل جاهزية النقل في ${targetWilaya.n} إلى ${transportSc}/100 (${railLinked ? 'مرتبطة بالشبكة الوطنية للسكك SNTF' : 'دون ربط سككي حديدي حالي'})، ويربط محور ${peerName} (${distKm} كم) بين الأقطاب التموينية والصناعية (${industryScore}/100).`
+        : `Transport connectivity scores ${transportSc}/100 (${railLinked ? 'SNTF rail active' : 'no active rail link'}); the ${peerName} corridor (${distKm} km) governs freight flow for its ${industryScore}/100 industrial base.`
+    },
+    {
+      rank: 5,
       title: `Agro-Climatic Resilience & Drip Conversion (${droughtPct}% Stress, Soil ${targetWilaya.soil}/100)`,
       titleAr: `التحول إلى السقي الذكي وحماية المردود الفلاحي لـ ${targetWilaya.n} (إجهاد ${droughtPct}%، تربة ${targetWilaya.soil}/100)`,
       supportingAgents: ['Qwen (Agri Expert)', 'ChatGPT (Foresight)'],
@@ -109,9 +148,9 @@ export function conveneAiCouncil(
         : `Satellite NDVI (${targetWilaya.ndvi}), ${targetWilaya.rain} mm rainfall, and grade-${targetWilaya.soil}/100 soils indicate ${droughtPct}% drought vulnerability by ${targetYear}, mandating pressurized drip systems.`
     },
     {
-      rank: 4,
-      title: `Supply Chain & Industrial Logistics in ${targetWilaya.en} (${gapPct}% Retail Gap, Ind. ${industryScore}/100)`,
-      titleAr: `توسيع الشبكة التجارية واللوجستيك الصناعي لـ ${targetWilaya.n} (فجوة ${gapPct}%، صناعة ${industryScore}/100)`,
+      rank: 6,
+      title: `Supply Chain Coverage & Commercial Hubs in ${targetWilaya.en} (${gapPct}% Retail Gap)`,
+      titleAr: `توسيع الشبكة التجارية وأسواق الجملة لـ ${targetWilaya.n} (فجوة تموين ${gapPct}%)`,
       supportingAgents: ['DeepSeek (Reasoner)', 'Grok (Anomaly Watch)'],
       weightScore: commerceWeight,
       rationale: isAr
@@ -176,10 +215,31 @@ export function conveneAiCouncil(
       rootCause: isAr
         ? `تعارض أولويات العقار والتهيئة في ${targetWilaya.n} بين ضبط السعر (${targetWilaya.price.toLocaleString()} دج/م²) وحماية الأراضي الحساسة (Moran's I = ${moranSpatial.observedI}).`
         : `Spatial trade-off in ${targetWilaya.en} between housing affordability (${targetWilaya.price.toLocaleString()} DZD/m²) and ecological land preservation.`
+    },
+    {
+      topic: `${targetWilaya.en}: Health Equity (${healthCov}%) & Seismic Retrofit vs Rail-Logistics Expansion (${transportSc}/100)`,
+      topicAr: `${targetWilaya.n}: الموازنة بين التغطية الصحية والوقاية الزلزالية (${hazardIdx}/100) وتمديد السكك والنقل (${transportSc}/100)`,
+      contendingViews: [
+        {
+          agent: 'Claude (Risk & Policy Advisor)',
+          perspective: isAr
+            ? `توجيه الاستثمار الأوّلي في ${targetWilaya.n} إلى تأمين المستشفيات الـ ${hospitalsCnt} وتطبيق معايير RPA (${seismicPct}% خطر زلزالي) قبل التوسع اللوجستي.`
+            : `Front-load fiscal capex in ${targetWilaya.en} toward ${hospitalsCnt} hospital resilience and RPA seismic codes (${seismicPct}% seismic risk).`
+        },
+        {
+          agent: 'Muse Spark (Map Analyst)',
+          perspective: isAr
+            ? `بدون ربط سككي وطرقي فعّال (النقل حالياً ${transportSc}/100)، لن تصل سيارات الإسعاف ولا سلاسل التوريد في وقت الأزمات نحو ${peerName}.`
+            : `Without upgrading ${targetWilaya.en}'s ${transportSc}/100 transport & rail network, emergency ambulances and logistics to ${peerName} remain bottlenecked.`
+        }
+      ],
+      rootCause: isAr
+        ? `التزامن المكاني في ${targetWilaya.n} بين الحاجة لرفع التغطية الصحية (${healthCov}%) وتخفيض تعرض الأخطار (${hazardIdx}/100) عبر شبكة نقل موثوقة (${transportSc}/100).`
+        : `Co-dependence between elevating healthcare coverage (${healthCov}%), hazard safety (${hazardIdx}/100), and multimodal transit (${transportSc}/100).`
     }
   ];
 
-  // Wilaya-Specific Executive Roadmap
+  // Wilaya-Specific Executive Roadmap (Expanded with Health, Hazard & Rail/Transport authorities)
   const executiveRoadmap = [
     {
       action: isAr
@@ -192,29 +252,38 @@ export function conveneAiCouncil(
     },
     {
       action:
-        floodPct >= 25
+        hazardIdx >= 48 || floodPct >= 25
           ? isAr
-            ? `قرار ولائي عاجل لتجميد البناء في مسارات السيول بولاية ${targetWilaya.n} (تعرض ${floodPct}%)`
-            : `Enact Wali decree freezing permits in ${targetWilaya.en}'s ${floodPct}% flood-prone wadi beds`
+            ? `قرار ولائي لتجميد البناء في الأودية (${floodPct}%) وتفعيل مراقبة الزلازل والحرائق (${hazardIdx}/100)`
+            : `Enact Wali decree enforcing wadi setbacks (${floodPct}%) & CRAAG/DGPC hazard zones (${hazardIdx}/100)`
           : isAr
             ? `رقمنة السجل العقاري وتطهير العقار الصناعي في ${targetWilaya.n} (${targetWilaya.price.toLocaleString()} دج/م²)`
             : `Digitize cadastre and audit industrial land concessions in ${targetWilaya.en} (${targetWilaya.price.toLocaleString()} DZD/m²)`,
       actionAr:
-        floodPct >= 25
-          ? `تجميد البناء في مسارات السيول بولاية ${targetWilaya.n} (${floodPct}%)`
+        hazardIdx >= 48 || floodPct >= 25
+          ? `فرض معايير الأمان من الأخطار والسيول في ${targetWilaya.n} (${hazardIdx}/100)`
           : `رقمنة العقار الصناعي في ${targetWilaya.n}`,
-      leadOwner: isAr ? `السيد والي ${targetWilaya.n} + مديرية التعمير (DUAC)` : `Wali of ${targetWilaya.en} & DUAC`,
+      leadOwner: isAr ? `السيد والي ${targetWilaya.n} + CRAAG + الحماية المدنية (DGPC)` : `Wali of ${targetWilaya.en} + CRAAG + Civil Protection`,
       timeframe: 'Immediate 72h' as const,
-      costBenefitRatio: `1 : ${(3.2 + floodPct * 0.04).toFixed(1)}`
+      costBenefitRatio: `1 : ${(3.3 + hazardIdx * 0.03).toFixed(1)}`
     },
     {
       action: isAr
-        ? `تطوير منصة التموين والربط اللوجستي لـ ${targetWilaya.n} نحو ${peerName} (سد فجوة ${gapPct}% عبر ${targetWilaya.markets} سوقاً)`
-        : `Expand logistics & wholesale coverage in ${targetWilaya.en} toward ${peerName} (closing ${gapPct}% gap across ${targetWilaya.markets} markets)`,
-      actionAr: `تطوير منصة التموين والربط اللوجستي لـ ${targetWilaya.n} نحو ${peerName}`,
-      leadOwner: isAr ? `وزارة التجارة + ولاية ${targetWilaya.n} (طرق ${targetWilaya.roads}%)` : `Ministry of Trade & ${targetWilaya.en} Wilaya`,
+        ? `رفع التغطية الصحية في ${targetWilaya.n} من ${healthCov}% عبر دعم المستشفيات الـ ${hospitalsCnt} وتخصيص أقطاب استعجالات متنقلة`
+        : `Scale healthcare access in ${targetWilaya.en} from ${healthCov}% across ${hospitalsCnt} hospitals + mobile emergency clinics`,
+      actionAr: `رفع التغطية الصحية وتأهيل المستشفيات الـ ${hospitalsCnt} في ${targetWilaya.n} (${healthCov}%)`,
+      leadOwner: isAr ? `وزارة الصحة (MSPRH) + مديرية الصحة لولاية ${targetWilaya.n}` : `Ministry of Health (MSPRH) & ${targetWilaya.en} DSP`,
       timeframe: 'Mid-term 2027' as const,
-      costBenefitRatio: `1 : ${(2.5 + gapPct * 0.03).toFixed(1)}`
+      costBenefitRatio: `1 : ${(3.5 + (100 - healthCov) * 0.04).toFixed(1)}`
+    },
+    {
+      action: isAr
+        ? `تطوير منصة النقل متعدد الوسائط (${transportSc}/100${railLinked ? ' — تعظيم خط SNTF' : ' — مد وصلة سكة حديدية'}) وربط الأسواق نحو ${peerName}`
+        : `Upgrade multimodal transport (${transportSc}/100${railLinked ? ', SNTF rail freight hub' : ', extend SNTF feeder'}) & retail logistics to ${peerName}`,
+      actionAr: `تطوير شبكة النقل والسكك والربط التجاري لـ ${targetWilaya.n} نحو ${peerName}`,
+      leadOwner: isAr ? `وزارة النقل (SNTF) + التجارة لولاية ${targetWilaya.n}` : `Ministry of Transport (SNTF) & Trade`,
+      timeframe: 'Mid-term 2027' as const,
+      costBenefitRatio: `1 : ${(2.9 + (100 - transportSc) * 0.03).toFixed(1)}`
     },
     {
       action:

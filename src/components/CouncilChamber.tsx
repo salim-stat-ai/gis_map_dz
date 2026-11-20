@@ -120,7 +120,7 @@ export const CouncilChamber: React.FC<CouncilChamberProps> = ({
             <ShieldCheck className="w-4 h-4" />
             <span>{councilResult.dataQualityAudit.sourceReliability}</span>
           </b>
-          <span className="text-[11px] text-slate-400 mt-1 block">ONS + ANRH + ONM</span>
+          <span className="text-[11px] text-slate-400 mt-1 block">ONS + ANRH + MSPRH + CRAAG + SNTF</span>
         </div>
 
         <div className="bg-[#0D172E] border border-white/10 rounded-xl p-4 shadow-lg">

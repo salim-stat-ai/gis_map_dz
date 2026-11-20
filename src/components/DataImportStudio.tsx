@@ -275,7 +275,8 @@ export const DataImportStudio: React.FC<DataImportStudioProps> = ({
       const patch: Partial<WilayaRecord> = {};
       const numericFields = [
         'pop', 'price', 'soil', 'rain', 'ndvi', 'dams', 'wells',
-        'waterDef', 'markets', 'coverage', 'energy', 'roads', 'labor', 'industry'
+        'waterDef', 'markets', 'coverage', 'energy', 'roads', 'labor', 'industry',
+        'hospitals', 'healthCoverage', 'seismicRisk', 'wildfireRisk', 'hazardIndex', 'transportScore'
       ];
 
       numericFields.forEach(k => {
@@ -288,6 +289,11 @@ export const DataImportStudio: React.FC<DataImportStudioProps> = ({
         let f = Number(r.flood);
         if (f > 1) f = f / 100;
         patch.flood = Math.max(0, Math.min(1, f));
+      }
+
+      if (r.railAccess !== undefined && r.railAccess !== '') {
+        const rawRail = String(r.railAccess).trim().toLowerCase();
+        patch.railAccess = rawRail === '1' || rawRail === 'true' || rawRail === 'yes' || rawRail === 'oui' || rawRail === 'نعم';
       }
 
       if (existing) {
@@ -319,6 +325,13 @@ export const DataImportStudio: React.FC<DataImportStudioProps> = ({
           roads: patch.roads ?? 70,
           labor: patch.labor ?? 50,
           industry: patch.industry ?? 45,
+          hospitals: patch.hospitals,
+          healthCoverage: patch.healthCoverage,
+          seismicRisk: patch.seismicRisk,
+          wildfireRisk: patch.wildfireRisk,
+          hazardIndex: patch.hazardIndex,
+          transportScore: patch.transportScore,
+          railAccess: patch.railAccess,
           isCustomImport: true
         };
         currentMap.set(key, newWilaya);
@@ -355,8 +368,9 @@ export const DataImportStudio: React.FC<DataImportStudioProps> = ({
             <span>{isAr ? 'استيراد البيانات — تغذية الخريطة بملفاتك الخاصة' : 'Data Import — feed the map with your own files'}</span>
           </h2>
           <p className="text-xs sm:text-sm text-slate-300 mt-1 leading-relaxed">
-            CSV, Excel (.xlsx), TXT, JSON, GeoJSON, KML, zipped Shapefiles (.zip with .shp+.dbf) and SQLite databases (.db) — from file{' '}
-            <b className="text-sky-400">or URL</b>. Columns auto-map to the 18 indicators — adjust, preview, then merge. Export the enriched dataset back to CSV / Excel / GeoJSON / KML.
+            {isAr
+              ? `CSV, Excel (.xlsx), TXT, JSON, GeoJSON, KML, Shapefile (.zip) وSQLite (.db) — من ملف أو رابط URL. ربط آلي للحقول (${IMPORT_FIELDS.length} حقلاً شاملة الصحة والأخطار الطبيعية والنقل والسكك).`
+              : `CSV, Excel (.xlsx), TXT, JSON, GeoJSON, KML, zipped Shapefiles (.zip) and SQLite (.db) — from file or URL. Columns auto-map to ${IMPORT_FIELDS.length} indicator fields (including Health, Natural Hazards & Rail/Transport) with full multi-format export.`}
           </p>
         </div>
 
@@ -405,6 +419,7 @@ export const DataImportStudio: React.FC<DataImportStudioProps> = ({
               <option value="gadm-dz">GADM — Algeria provinces (polygons)</option>
               <option value="osm-dams">OSM — dams & reservoirs, Algeria (Overpass)</option>
               <option value="osm-hosp">OSM — hospitals, Algiers (Overpass)</option>
+              <option value="osm-rail">OSM — railway stations & SNTF network (Overpass)</option>
               <option value="ons-economy">ONS — National Office of Statistics (Wilaya Indicators)</option>
               <option value="anrh-water">ANRH — National Water Agency (Dams & Deficit)</option>
               <option value="worldbank-dz">World Bank — Algeria Indicators API</option>
@@ -533,10 +548,14 @@ export const DataImportStudio: React.FC<DataImportStudioProps> = ({
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
                 <Filter className="w-3.5 h-3.5 text-sky-400" />
-                <span>{isAr ? 'ربط الأعمدة بمؤشرات الجزائر الـ 18' : 'Auto-Map Columns to the 18 Indicators'}</span>
+                <span>
+                  {isAr
+                    ? `ربط الأعمدة بمؤشرات المنصة (${IMPORT_FIELDS.length} حقلاً محدثاً)`
+                    : `Auto-Map Columns (${IMPORT_FIELDS.length} Synchronized Indicators)`}
+                </span>
               </h3>
               <span className="text-[11px] text-slate-400">
-                {activeMappedKeys.length} / 18 {isAr ? 'مؤشر مرتبط' : 'indicators mapped'}
+                {activeMappedKeys.length} / {IMPORT_FIELDS.length} {isAr ? 'مؤشر مرتبط' : 'indicators mapped'}
               </span>
             </div>
 
@@ -653,12 +672,14 @@ export const DataImportStudio: React.FC<DataImportStudioProps> = ({
 
           <div className="bg-[#121F3D] p-3 rounded-xl border border-white/5">
             <span className="text-[10px] text-slate-400 block">{isAr ? 'الأعمدة المكتشفة' : 'Detected Columns'}</span>
-            <b className="text-base text-sky-400 font-mono mt-0.5 block">{importCols.length || 18}</b>
+            <b className="text-base text-sky-400 font-mono mt-0.5 block">{importCols.length || IMPORT_FIELDS.length}</b>
           </div>
 
           <div className="bg-[#121F3D] p-3 rounded-xl border border-white/5">
             <span className="text-[10px] text-slate-400 block">{isAr ? 'مؤشرات مرتبطة' : 'Mapped Indicators'}</span>
-            <b className="text-base text-emerald-400 font-mono mt-0.5 block">{activeMappedKeys.length || 18}/18</b>
+            <b className="text-base text-emerald-400 font-mono mt-0.5 block">
+              {activeMappedKeys.length || IMPORT_FIELDS.length}/{IMPORT_FIELDS.length}
+            </b>
           </div>
 
           <div className="bg-[#121F3D] p-3 rounded-xl border border-white/5">
