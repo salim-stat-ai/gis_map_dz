@@ -133,8 +133,26 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
 
   const [currentBasemap, setCurrentBasemap] = useState<BasemapKey>('osm');
   const tileLayerRef = useRef<L.TileLayer | null>(null);
-  const [chartMetric, setChartMetric] = useState<'waterDef' | 'rain' | 'price' | 'pop'>('waterDef');
+  const [chartMetric, setChartMetric] = useState<
+    'waterDef' | 'rain' | 'ndvi' | 'price' | 'pop' | 'coverage' | 'industry' | 'health' | 'hazards' | 'transport' | 'tourism'
+  >('waterDef');
   const [showRadarBenchmark, setShowRadarBenchmark] = useState<boolean>(true);
+
+  useEffect(() => {
+    const sectorToMetric: Partial<Record<SectorKey, typeof chartMetric>> = {
+      water: 'waterDef',
+      agri: 'ndvi',
+      realestate: 'price',
+      commerce: 'coverage',
+      industry: 'industry',
+      health: 'health',
+      hazards: 'hazards',
+      transport: 'transport',
+      tourism: 'tourism'
+    };
+    const mapped = sectorToMetric[currentSector];
+    if (mapped) setChartMetric(mapped);
+  }, [currentSector]);
 
   const [activeLayers, setActiveLayers] = useState<Record<string, boolean>>({
     realestate: true,
@@ -511,10 +529,40 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
       const projYears = [2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035];
       const allYears = [...histYears, ...projYears];
 
+      const clamp100 = (v: number) => Math.max(0, Math.min(100, Math.round(v)));
+
       const getHistSeries = () => {
         if (chartMetric === 'rain') return (selectedWilaya.historicalRain ?? Array(8).fill(selectedWilaya.rain)).slice(-4).map(v => Math.round(v));
         if (chartMetric === 'price') return (selectedWilaya.historicalPrice ?? Array(8).fill(selectedWilaya.price)).slice(-4).map(v => Math.round(v));
         if (chartMetric === 'pop') return (selectedWilaya.historicalPop ?? Array(8).fill(selectedWilaya.pop)).slice(-4).map(v => Math.round(v));
+        if (chartMetric === 'ndvi') {
+          const c = clamp100(selectedWilaya.ndvi * 100);
+          return [clamp100(c + 4), clamp100(c + 2), clamp100(c + 1), c];
+        }
+        if (chartMetric === 'coverage') {
+          const c = clamp100(selectedWilaya.coverage);
+          return [clamp100(c - 4), clamp100(c - 3), clamp100(c - 1), c];
+        }
+        if (chartMetric === 'industry') {
+          const c = industryScore(selectedWilaya);
+          return [clamp100(c - 5), clamp100(c - 3), clamp100(c - 2), c];
+        }
+        if (chartMetric === 'health') {
+          const c = getHealthCoverage(selectedWilaya);
+          return [Math.max(15, c - 3), Math.max(15, c - 2), Math.max(15, c - 1), c];
+        }
+        if (chartMetric === 'hazards') {
+          const c = getHazardIndex(selectedWilaya);
+          return [Math.max(5, c - 2), Math.max(5, c - 1), Math.max(5, c - 1), c];
+        }
+        if (chartMetric === 'transport') {
+          const c = getTransportScore(selectedWilaya);
+          return [Math.max(18, c - 4), Math.max(18, c - 2), Math.max(18, c - 1), c];
+        }
+        if (chartMetric === 'tourism') {
+          const c = getTourismScore(selectedWilaya);
+          return [Math.max(18, c - 3), Math.max(18, c - 2), Math.max(18, c - 1), c];
+        }
         return (selectedWilaya.historicalWaterDef ?? Array(8).fill(selectedWilaya.waterDef)).slice(-4).map(v => Math.round(v * 10));
       };
 
@@ -523,11 +571,38 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
         if (chartMetric === 'rain') {
           return Math.max(10, Math.round(selectedWilaya.rain * Math.pow(0.989, h)));
         }
+        if (chartMetric === 'ndvi') {
+          const c = clamp100(selectedWilaya.ndvi * 100);
+          return Math.max(5, Math.min(95, Math.round(c * Math.pow(0.992, h) - (selectedWilaya.waterDef < -20 ? h * 0.45 : 0))));
+        }
         if (chartMetric === 'price') {
           return Math.round(selectedWilaya.price * Math.pow(1.028 + (selectedWilaya.industry / 100) * 0.012, h));
         }
         if (chartMetric === 'pop') {
           return Math.round(selectedWilaya.pop * Math.pow(selectedWilaya.region === 'Sahara' ? 1.019 : 1.015, h));
+        }
+        if (chartMetric === 'coverage') {
+          return Math.max(25, Math.min(99, Math.round(selectedWilaya.coverage + h * (selectedWilaya.coverage < 65 ? 0.55 : 0.25))));
+        }
+        if (chartMetric === 'industry') {
+          const c = industryScore(selectedWilaya);
+          return Math.max(20, Math.min(99, Math.round(c + h * (selectedWilaya.energy >= 70 ? 0.75 : 0.4))));
+        }
+        if (chartMetric === 'health') {
+          const c = getHealthCoverage(selectedWilaya);
+          return Math.max(20, Math.min(98, Math.round(c + h * (c < 55 ? 0.35 : 0.22) - (selectedWilaya.pop > 1200 ? h * 0.18 : 0))));
+        }
+        if (chartMetric === 'hazards') {
+          const c = getHazardIndex(selectedWilaya);
+          return Math.max(8, Math.min(99, Math.round(c + h * (c >= 55 ? 0.85 : 0.45))));
+        }
+        if (chartMetric === 'transport') {
+          const c = getTransportScore(selectedWilaya);
+          return Math.max(20, Math.min(99, Math.round(c + h * (hasRailAccess(selectedWilaya) ? 0.75 : 0.45))));
+        }
+        if (chartMetric === 'tourism') {
+          const c = getTourismScore(selectedWilaya);
+          return Math.max(20, Math.min(99, Math.round(c + h * (getHeritageSitesCount(selectedWilaya) >= 8 ? 0.9 : 0.5))));
         }
         return Math.round(
           selectedWilaya.waterDef * 10 - (selectedWilaya.pop * 0.035 * Math.max(0, y - 2026)) * 0.15 - (selectedWilaya.rain * 0.012 * Math.max(0, y - 2026)) * 0.2
@@ -544,8 +619,15 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
       const metricPalette: Record<typeof chartMetric, { line: string; fillTop: string; unit: string }> = {
         waterDef: { line: '#38BDF8', fillTop: 'rgba(56, 189, 248, 0.35)', unit: '' },
         rain: { line: '#10B981', fillTop: 'rgba(16, 185, 129, 0.35)', unit: ' mm' },
+        ndvi: { line: '#84CC16', fillTop: 'rgba(132, 204, 22, 0.32)', unit: '/100' },
         price: { line: '#F59E0B', fillTop: 'rgba(245, 158, 11, 0.35)', unit: ' DZD' },
-        pop: { line: '#A78BFA', fillTop: 'rgba(167, 139, 250, 0.35)', unit: 'k' }
+        pop: { line: '#A78BFA', fillTop: 'rgba(167, 139, 250, 0.35)', unit: 'k' },
+        coverage: { line: '#C084FC', fillTop: 'rgba(192, 132, 252, 0.32)', unit: '%' },
+        industry: { line: '#818CF8', fillTop: 'rgba(129, 140, 248, 0.32)', unit: '/100' },
+        health: { line: '#2DD4BF', fillTop: 'rgba(45, 212, 191, 0.32)', unit: '%' },
+        hazards: { line: '#FB7185', fillTop: 'rgba(251, 113, 133, 0.32)', unit: '/100' },
+        transport: { line: '#22D3EE', fillTop: 'rgba(34, 211, 238, 0.32)', unit: '/100' },
+        tourism: { line: '#FBBF24', fillTop: 'rgba(251, 191, 36, 0.32)', unit: '/100' }
       };
       const pal = metricPalette[chartMetric];
 
@@ -651,13 +733,13 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
       });
     }
 
-    // 2. Multi-Sector Radar Chart with National Mean Benchmark Overlay
+    // 2. 10-Sector Comprehensive Radar Chart with National Mean Benchmark Overlay
     if (chartRadarRef.current) {
       if (chartRadarInstance.current) chartRadarInstance.current.destroy();
 
       const radarLabels = isAr
-        ? ['التربة', 'الأمطار', 'NDVI', 'الطاقة', 'الطرق', 'التغطية']
-        : ['Soil', 'Rain', 'NDVI', 'Energy', 'Roads', 'Coverage'];
+        ? ['التربة', 'الأمطار', 'NDVI', 'الطاقة', 'التغطية', 'الصناعة', 'الصحة', 'الأمان', 'النقل', 'السياحة']
+        : ['Soil', 'Rain', 'NDVI', 'Energy', 'Retail', 'Industry', 'Health', 'Safety', 'Transport', 'Tourism'];
 
       const clamp100 = (v: number) => Math.max(0, Math.min(100, Math.round(v)));
 
@@ -666,8 +748,12 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
         clamp100(selectedWilaya.rain / 10),
         clamp100(selectedWilaya.ndvi * 100),
         clamp100(selectedWilaya.energy),
-        clamp100(selectedWilaya.roads),
-        clamp100(selectedWilaya.coverage)
+        clamp100(selectedWilaya.coverage),
+        clamp100(industryScore(selectedWilaya)),
+        clamp100(getHealthCoverage(selectedWilaya)),
+        clamp100(100 - getHazardIndex(selectedWilaya)),
+        clamp100(getTransportScore(selectedWilaya)),
+        clamp100(getTourismScore(selectedWilaya))
       ];
 
       const nCount = Math.max(1, wilayas.length);
@@ -676,8 +762,12 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
         clamp100(wilayas.reduce((s, x) => s + x.rain / 10, 0) / nCount),
         clamp100(wilayas.reduce((s, x) => s + x.ndvi * 100, 0) / nCount),
         clamp100(wilayas.reduce((s, x) => s + x.energy, 0) / nCount),
-        clamp100(wilayas.reduce((s, x) => s + x.roads, 0) / nCount),
-        clamp100(wilayas.reduce((s, x) => s + x.coverage, 0) / nCount)
+        clamp100(wilayas.reduce((s, x) => s + x.coverage, 0) / nCount),
+        clamp100(wilayas.reduce((s, x) => s + industryScore(x), 0) / nCount),
+        clamp100(wilayas.reduce((s, x) => s + getHealthCoverage(x), 0) / nCount),
+        clamp100(wilayas.reduce((s, x) => s + (100 - getHazardIndex(x)), 0) / nCount),
+        clamp100(wilayas.reduce((s, x) => s + getTransportScore(x), 0) / nCount),
+        clamp100(wilayas.reduce((s, x) => s + getTourismScore(x), 0) / nCount)
       ];
 
       const rawFormats = [
@@ -686,7 +776,11 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
         (v: number) => `${(v / 100).toFixed(2)}`,
         (v: number) => `${v}%`,
         (v: number) => `${v}%`,
-        (v: number) => `${v}%`
+        (v: number) => `${v}/100`,
+        (v: number) => `${v}%`,
+        (v: number) => `${v}/100`,
+        (v: number) => `${v}/100`,
+        (v: number) => `${v}/100`
       ];
 
       const datasets: any[] = [
@@ -699,8 +793,8 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
           pointBackgroundColor: '#FBBF24',
           pointBorderColor: '#081020',
           pointBorderWidth: 1.5,
-          pointRadius: 4,
-          pointHoverRadius: 6
+          pointRadius: 3.5,
+          pointHoverRadius: 5.5
         }
       ];
 
@@ -713,7 +807,7 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
           borderWidth: 1.8,
           borderDash: [4, 3],
           pointBackgroundColor: '#38BDF8',
-          pointRadius: 2.5,
+          pointRadius: 2,
           pointHoverRadius: 4
         });
       }
@@ -755,8 +849,8 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
               grid: { color: 'rgba(255,255,255,0.09)', circular: true },
               pointLabels: {
                 color: '#E2E8F0',
-                font: { size: 11, weight: 'bold' },
-                padding: 6
+                font: { size: 9.5, weight: 'bold' },
+                padding: 4
               },
               ticks: {
                 stepSize: 50,
@@ -1183,9 +1277,23 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
                       ? isAr ? `العجز المائي (${selectedWilaya.n})` : `Water Trajectory (${selectedWilaya.en})`
                       : chartMetric === 'rain'
                       ? isAr ? `التساقط (${selectedWilaya.n})` : `Rainfall mm (${selectedWilaya.en})`
+                      : chartMetric === 'ndvi'
+                      ? isAr ? `الغطاء النباتي NDVI (${selectedWilaya.n})` : `Vegetation NDVI (${selectedWilaya.en})`
                       : chartMetric === 'price'
                       ? isAr ? `العقار دج/م² (${selectedWilaya.n})` : `Land Price (${selectedWilaya.en})`
-                      : isAr ? `السكان ألف (${selectedWilaya.n})` : `Population k (${selectedWilaya.en})`}
+                      : chartMetric === 'pop'
+                      ? isAr ? `السكان ألف (${selectedWilaya.n})` : `Population k (${selectedWilaya.en})`
+                      : chartMetric === 'coverage'
+                      ? isAr ? `التغطية التجارية % (${selectedWilaya.n})` : `Retail Coverage % (${selectedWilaya.en})`
+                      : chartMetric === 'industry'
+                      ? isAr ? `الجاهزية الصناعية (${selectedWilaya.n})` : `Industry Readiness (${selectedWilaya.en})`
+                      : chartMetric === 'health'
+                      ? isAr ? `التغطية الصحية % (${selectedWilaya.n})` : `Health Coverage % (${selectedWilaya.en})`
+                      : chartMetric === 'hazards'
+                      ? isAr ? `مؤشر الأخطار الطبيعية (${selectedWilaya.n})` : `Natural Hazards Index (${selectedWilaya.en})`
+                      : chartMetric === 'transport'
+                      ? isAr ? `النقل والسكك (${selectedWilaya.n})` : `Transport & Rail (${selectedWilaya.en})`
+                      : isAr ? `السياحة والتراث (${selectedWilaya.n})` : `Tourism & Heritage (${selectedWilaya.en})`}
                   </span>
                 </div>
                 <span className="text-[10px] font-mono bg-amber-500/15 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded shrink-0">
@@ -1193,19 +1301,26 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
                 </span>
               </div>
 
-              {/* Interactive Metric Switcher */}
-              <div className="grid grid-cols-4 gap-1 text-[10px]">
+              {/* Interactive All-Layer Metric Switcher */}
+              <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-3 gap-1 text-[10px]">
                 {[
                   { id: 'waterDef' as const, ar: '💧 المياه', en: '💧 Water' },
                   { id: 'rain' as const, ar: '🌧️ المطر', en: '🌧️ Rain' },
+                  { id: 'ndvi' as const, ar: '🌾 الغطاء', en: '🌾 NDVI' },
                   { id: 'price' as const, ar: '🏠 العقار', en: '🏠 Price' },
-                  { id: 'pop' as const, ar: '👥 السكان', en: '👥 Pop' }
+                  { id: 'pop' as const, ar: '👥 السكان', en: '👥 Pop' },
+                  { id: 'coverage' as const, ar: '🛒 التجارة', en: '🛒 Retail' },
+                  { id: 'industry' as const, ar: '🏭 الصناعة', en: '🏭 Industry' },
+                  { id: 'health' as const, ar: '🏥 الصحة', en: '🏥 Health' },
+                  { id: 'hazards' as const, ar: '🌋 الأخطار', en: '🌋 Hazards' },
+                  { id: 'transport' as const, ar: '🚆 النقل', en: '🚆 Transit' },
+                  { id: 'tourism' as const, ar: '🏖️ السياحة', en: '🏖️ Tourism' }
                 ].map(m => (
                   <button
                     key={m.id}
                     type="button"
                     onClick={() => setChartMetric(m.id)}
-                    className={`py-1 rounded font-semibold transition cursor-pointer ${
+                    className={`py-1 px-1 rounded font-semibold transition cursor-pointer truncate ${
                       chartMetric === m.id
                         ? 'bg-sky-500/25 text-sky-300 border border-sky-500/40'
                         : 'bg-[#101C36] text-slate-400 hover:text-slate-200 border border-white/5'
@@ -1233,19 +1348,47 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
 
               {/* Real-world explanation of Curve 1 */}
               {(() => {
-                const lastHist = chartMetric === 'rain'
-                  ? Math.round((selectedWilaya.historicalRain ?? [selectedWilaya.rain]).slice(-1)[0])
-                  : chartMetric === 'price'
-                  ? Math.round((selectedWilaya.historicalPrice ?? [selectedWilaya.price]).slice(-1)[0])
-                  : chartMetric === 'pop'
-                  ? Math.round((selectedWilaya.historicalPop ?? [selectedWilaya.pop]).slice(-1)[0])
+                const clamp100 = (v: number) => Math.max(0, Math.min(100, Math.round(v)));
+                const lastHist =
+                  chartMetric === 'rain' ? Math.round((selectedWilaya.historicalRain ?? [selectedWilaya.rain]).slice(-1)[0])
+                  : chartMetric === 'price' ? Math.round((selectedWilaya.historicalPrice ?? [selectedWilaya.price]).slice(-1)[0])
+                  : chartMetric === 'pop' ? Math.round((selectedWilaya.historicalPop ?? [selectedWilaya.pop]).slice(-1)[0])
+                  : chartMetric === 'ndvi' ? clamp100(selectedWilaya.ndvi * 100)
+                  : chartMetric === 'coverage' ? clamp100(selectedWilaya.coverage)
+                  : chartMetric === 'industry' ? industryScore(selectedWilaya)
+                  : chartMetric === 'health' ? getHealthCoverage(selectedWilaya)
+                  : chartMetric === 'hazards' ? getHazardIndex(selectedWilaya)
+                  : chartMetric === 'transport' ? getTransportScore(selectedWilaya)
+                  : chartMetric === 'tourism' ? getTourismScore(selectedWilaya)
                   : Math.round(((selectedWilaya.historicalWaterDef ?? [selectedWilaya.waterDef]).slice(-1)[0]) * 10);
 
                 const calcTarget = (yr: number) => {
                   const h = yr - 2025;
                   if (chartMetric === 'rain') return Math.max(10, Math.round(selectedWilaya.rain * Math.pow(0.989, h)));
+                  if (chartMetric === 'ndvi') {
+                    const c = clamp100(selectedWilaya.ndvi * 100);
+                    return Math.max(5, Math.min(95, Math.round(c * Math.pow(0.992, h) - (selectedWilaya.waterDef < -20 ? h * 0.45 : 0))));
+                  }
                   if (chartMetric === 'price') return Math.round(selectedWilaya.price * Math.pow(1.028 + (selectedWilaya.industry / 100) * 0.012, h));
                   if (chartMetric === 'pop') return Math.round(selectedWilaya.pop * Math.pow(selectedWilaya.region === 'Sahara' ? 1.019 : 1.015, h));
+                  if (chartMetric === 'coverage') return Math.max(25, Math.min(99, Math.round(selectedWilaya.coverage + h * (selectedWilaya.coverage < 65 ? 0.55 : 0.25))));
+                  if (chartMetric === 'industry') return Math.max(20, Math.min(99, Math.round(industryScore(selectedWilaya) + h * (selectedWilaya.energy >= 70 ? 0.75 : 0.4))));
+                  if (chartMetric === 'health') {
+                    const c = getHealthCoverage(selectedWilaya);
+                    return Math.max(20, Math.min(98, Math.round(c + h * (c < 55 ? 0.35 : 0.22) - (selectedWilaya.pop > 1200 ? h * 0.18 : 0))));
+                  }
+                  if (chartMetric === 'hazards') {
+                    const c = getHazardIndex(selectedWilaya);
+                    return Math.max(8, Math.min(99, Math.round(c + h * (c >= 55 ? 0.85 : 0.45))));
+                  }
+                  if (chartMetric === 'transport') {
+                    const c = getTransportScore(selectedWilaya);
+                    return Math.max(20, Math.min(99, Math.round(c + h * (hasRailAccess(selectedWilaya) ? 0.75 : 0.45))));
+                  }
+                  if (chartMetric === 'tourism') {
+                    const c = getTourismScore(selectedWilaya);
+                    return Math.max(20, Math.min(99, Math.round(c + h * (getHeritageSitesCount(selectedWilaya) >= 8 ? 0.9 : 0.5))));
+                  }
                   return Math.round(selectedWilaya.waterDef * 10 - (selectedWilaya.pop * 0.035 * Math.max(0, yr - 2026)) * 0.15 - (selectedWilaya.rain * 0.012 * Math.max(0, yr - 2026)) * 0.2);
                 };
 
@@ -1255,19 +1398,47 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
 
                 const meaningText = chartMetric === 'waterDef'
                   ? isAr
-                    ? `الخط الرمادي (2022–2025) يعكس المخزون الفعلي حتى (${lastHist}). الهبوط المتقطع نحو (${valTarget}) في ${targetYear} ثم (${val2035}) في 2035 يعني توسّع الفجوة المائية نتيجة ضغط السكان وقلة التساقط ما لم تُنجز مشاريع تحويل أو تحلية. النقطة الصفراء ★ تمثل أفق الخطة المختار.`
-                    : `Grey line shows observed storage (${lastHist} in 2025). Dashed drop to ${valTarget} (${targetYear} ★) and ${val2035} (2035) signals widening water deficit under demographic demand unless supply projects intervene.`
+                    ? `الخط الرمادي (2022–2025) يعكس المخزون الفعلي (${lastHist}). الاتجاه نحو (${valTarget}) في ${targetYear} ★ ثم (${val2035}) في 2035 يكشف الفجوة المائية المستقبلية تحت ضغط السكان ما لم تُنجز مشاريع تحلية أو تحويل.`
+                    : `Grey line tracks observed storage (${lastHist} in 2025). Dashed shift to ${valTarget} (${targetYear} ★) and ${val2035} (2035) signals widening water stress unless supply projects intervene.`
                   : chartMetric === 'rain'
                   ? isAr
                     ? `من ${lastHist} ملم (2025) إلى ${valTarget} ملم في ${targetYear} (★) و${val2035} ملم في 2035: يوضح التراجع المناخي التدريجي وأثره المباشر على امتلاء السدود والزراعة المطرية.`
                     : `From ${lastHist} mm (2025) to ${valTarget} mm (${targetYear} ★) and ${val2035} mm (2035): tracks climate drying pressure on dam recharge and rain-fed farming.`
+                  : chartMetric === 'ndvi'
+                  ? isAr
+                    ? `مؤشر الغطاء النباتي (NDVI×100) ينتقل من ${lastHist}/100 إلى ${valTarget} في ${targetYear} (★) و${val2035} في 2035؛ تراجعه يعني إجهاداً نباتياً يستدعي السقي الموضعي والري التكميلي.`
+                    : `Vegetation index (NDVI×100) moves from ${lastHist}/100 to ${valTarget} (${targetYear} ★) and ${val2035} (2035); downward drift signals crop stress requiring drip irrigation.`
                   : chartMetric === 'price'
                   ? isAr
                     ? `ارتفاع السعر من ${fmt(lastHist)} إلى ${fmt(valTarget)} دج/م² (${targetYear} ★) ثم ${fmt(val2035)} (2035) يعبر عن تسارع الطلب الحضري والصناعي على الأراضي بالولاية.`
                     : `Climb from ${fmt(lastHist)} to ${fmt(valTarget)} DZD/m² (${targetYear} ★) and ${fmt(val2035)} (2035) reflects urban and industrial land pressure.`
+                  : chartMetric === 'pop'
+                  ? isAr
+                    ? `زيادة السكان من ${lastHist} ألف (2025) إلى ${valTarget} ألف (${targetYear} ★) ثم ${val2035} ألف (2035) تعني حاجة متزايدة للسكن والماء والمرافق الصحية.`
+                    : `Population growth from ${lastHist}k (2025) to ${valTarget}k (${targetYear} ★) and ${val2035}k (2035) quantifies future housing, water, and health demand.`
+                  : chartMetric === 'coverage'
+                  ? isAr
+                    ? `التغطية التجارية والتموينية من ${lastHist}% إلى ${valTarget}% (${targetYear} ★) و${val2035}% (2035): يقيس مدى سد فجوات أسواق الجملة وسلاسل التبريد بالولاية.`
+                    : `Retail coverage rises from ${lastHist}% to ${valTarget}% (${targetYear} ★) and ${val2035}% (2035), tracking wholesale market & cold-chain adequacy.`
+                  : chartMetric === 'industry'
+                  ? isAr
+                    ? `مؤشر الجاهزية الصناعية من ${lastHist}/100 إلى ${valTarget} (${targetYear} ★) و${val2035} (2035) بناءً على توفر الطاقة، الطرق، واليد العاملة والمياه.`
+                    : `Industrial readiness evolves from ${lastHist}/100 to ${valTarget} (${targetYear} ★) and ${val2035} (2035) driven by grid power, road access, and water balance.`
+                  : chartMetric === 'health'
+                  ? isAr
+                    ? `التغطية الصحية (${getHospitalsCount(selectedWilaya)} مستشفى) تتغير من ${lastHist}% إلى ${valTarget}% (${targetYear} ★) و${val2035}% (2035)؛ التباطؤ في الولايات الكبرى يعكس ضغط النمو السكاني على الأسرّة.`
+                    : `Health coverage (${getHospitalsCount(selectedWilaya)} hospitals) moves from ${lastHist}% to ${valTarget}% (${targetYear} ★) and ${val2035}% (2035); slower gains reflect demographic bed strain.`
+                  : chartMetric === 'hazards'
+                  ? isAr
+                    ? `مؤشر الأخطار الطبيعية المركب (زلازل/فيضانات/حرائق) يرتفع من ${lastHist}/100 إلى ${valTarget} (${targetYear} ★) و${val2035} (2035) إذا استمر التوسع العمراني دون تطبيق صارم لكود البناء RPA ومصدات الحرائق.`
+                    : `Composite hazard index (seismic/flood/wildfire) climbs from ${lastHist}/100 to ${valTarget} (${targetYear} ★) and ${val2035} (2035) without strict RPA zoning & firebreaks.`
+                  : chartMetric === 'transport'
+                  ? isAr
+                    ? `مؤشر النقل والربط (${hasRailAccess(selectedWilaya) ? 'مربوطة بالسكة الحديدية 🚆' : 'اعتماد على الطريق البري'}) يتحسن من ${lastHist}/100 إلى ${valTarget} (${targetYear} ★) و${val2035} (2035) مع مشاريع السكك والمحاور اللوجستية.`
+                    : `Transport connectivity (${hasRailAccess(selectedWilaya) ? 'Rail-linked 🚆' : 'Road-dependent'}) shifts from ${lastHist}/100 to ${valTarget} (${targetYear} ★) and ${val2035} (2035).`
                   : isAr
-                    ? `زيادة السكان من ${lastHist} ألف (2025) إلى ${valTarget} ألف (${targetYear} ★) ثم ${val2035} ألف (2035) تعني حاجة متزايدة للسكن والماء والمرافق.`
-                    : `Population growth from ${lastHist}k (2025) to ${valTarget}k (${targetYear} ★) and ${val2035}k (2035) quantifies future housing and utility demand.`;
+                    ? `مؤشر الجاذبية السياحية والتراث MTA (${getHotelsCount(selectedWilaya)} فندقاً · ${getHeritageSitesCount(selectedWilaya)} معلماً) ينمو من ${lastHist}/100 إلى ${valTarget} (${targetYear} ★) و${val2035} (2035).`
+                    : `Tourism & Heritage index (${getHotelsCount(selectedWilaya)} hotels · ${getHeritageSitesCount(selectedWilaya)} heritage sites) grows from ${lastHist}/100 to ${valTarget} (${targetYear} ★) and ${val2035} (2035).`;
 
                 return (
                   <div className="bg-[#0C1730] border border-sky-500/20 rounded-lg p-2 text-[10.5px] text-slate-300 leading-relaxed space-y-1">
@@ -1281,7 +1452,7 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
               })()}
             </div>
 
-            {/* Card 2: Interactive Multi-Sector Radar vs National Mean */}
+            {/* Card 2: Interactive 10-Sector Radar vs National Mean */}
             <div className="bg-[#081020] p-3 rounded-xl border border-white/10 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
@@ -1309,11 +1480,11 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
                 </button>
               </div>
 
-              <div className="h-52 w-full">
+              <div className="h-56 w-full">
                 <canvas ref={chartRadarRef} />
               </div>
 
-              {/* Real-world explanation of Curve 2 (Radar) */}
+              {/* Real-world explanation of Curve 2 (10-Axis Radar) */}
               {(() => {
                 const nCount = Math.max(1, wilayas.length);
                 const clamp = (v: number) => Math.max(0, Math.min(100, Math.round(v)));
@@ -1322,8 +1493,12 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
                   { nameAr: 'الأمطار', nameEn: 'Rain', wVal: clamp(selectedWilaya.rain / 10), nVal: clamp(wilayas.reduce((s, x) => s + x.rain / 10, 0) / nCount) },
                   { nameAr: 'NDVI', nameEn: 'NDVI', wVal: clamp(selectedWilaya.ndvi * 100), nVal: clamp(wilayas.reduce((s, x) => s + x.ndvi * 100, 0) / nCount) },
                   { nameAr: 'الطاقة', nameEn: 'Energy', wVal: clamp(selectedWilaya.energy), nVal: clamp(wilayas.reduce((s, x) => s + x.energy, 0) / nCount) },
-                  { nameAr: 'الطرق', nameEn: 'Roads', wVal: clamp(selectedWilaya.roads), nVal: clamp(wilayas.reduce((s, x) => s + x.roads, 0) / nCount) },
-                  { nameAr: 'التغطية', nameEn: 'Coverage', wVal: clamp(selectedWilaya.coverage), nVal: clamp(wilayas.reduce((s, x) => s + x.coverage, 0) / nCount) }
+                  { nameAr: 'التغطية', nameEn: 'Retail', wVal: clamp(selectedWilaya.coverage), nVal: clamp(wilayas.reduce((s, x) => s + x.coverage, 0) / nCount) },
+                  { nameAr: 'الصناعة', nameEn: 'Industry', wVal: clamp(industryScore(selectedWilaya)), nVal: clamp(wilayas.reduce((s, x) => s + industryScore(x), 0) / nCount) },
+                  { nameAr: 'الصحة', nameEn: 'Health', wVal: clamp(getHealthCoverage(selectedWilaya)), nVal: clamp(wilayas.reduce((s, x) => s + getHealthCoverage(x), 0) / nCount) },
+                  { nameAr: 'الأمان البيئي', nameEn: 'Hazard Safety', wVal: clamp(100 - getHazardIndex(selectedWilaya)), nVal: clamp(wilayas.reduce((s, x) => s + (100 - getHazardIndex(x)), 0) / nCount) },
+                  { nameAr: 'النقل والسكك', nameEn: 'Transport', wVal: clamp(getTransportScore(selectedWilaya)), nVal: clamp(wilayas.reduce((s, x) => s + getTransportScore(x), 0) / nCount) },
+                  { nameAr: 'السياحة والتراث', nameEn: 'Tourism', wVal: clamp(getTourismScore(selectedWilaya)), nVal: clamp(wilayas.reduce((s, x) => s + getTourismScore(x), 0) / nCount) }
                 ];
                 const strengths = axes.filter(a => a.wVal >= a.nVal + 3).sort((a, b) => (b.wVal - b.nVal) - (a.wVal - a.nVal));
                 const weakAxes = axes.filter(a => a.wVal < a.nVal).sort((a, b) => (a.wVal - a.nVal) - (b.wVal - b.nVal));
@@ -1332,12 +1507,12 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
                 return (
                   <div className="bg-[#0C1730] border border-amber-500/20 rounded-lg p-2 text-[10.5px] text-slate-300 leading-relaxed space-y-1">
                     <div className="font-bold text-amber-300">
-                      {isAr ? '🧭 قراءة الرادار السداسي في الواقع:' : '🧭 How to read this radar in reality:'}
+                      {isAr ? '🧭 قراءة الرادار الشامل (10 قطاعات):' : '🧭 How to read this 10-sector radar:'}
                     </div>
                     <p>
                       {isAr
-                        ? `كلما خرج المضلع البرتقالي (${selectedWilaya.n}) خارج الخط الأزرق المتقطع (المتوسط الوطني)، دلّ على تفوق ميداني؛ وكلما اقترب من المركز (0) دلّ على نقطة ضعف.`
-                        : `Points where the orange polygon extends outside the dashed blue ring show above-average territorial strength; inward dips show bottlenecks.`}
+                        ? `كلما خرج المضلع البرتقالي (${selectedWilaya.n}) خارج الخط الأزرق المتقطع (المتوسط الوطني)، دلّ على تفوق ميداني عبر القطاعات الـ 10؛ وكلما اقترب من المركز (0) دلّ على نقطة ضعف.`
+                        : `Points where the orange polygon extends outside the dashed blue ring show above-average territorial strength across all 10 layers; inward dips show bottlenecks.`}
                     </p>
                     <p className="text-[10px] text-slate-200">
                       {isAr ? (
@@ -1349,7 +1524,7 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
                           ·{' '}
                           <b className="text-amber-300">{weakAxes.length > 0 ? 'فجوة مقارنة بالوطني:' : 'أضيق محور:'}</b>{' '}
                           {weakAxes.length > 0
-                            ? weakAxes.map(a => `${a.nameAr} (${a.wVal} مقابل ${a.nVal})`).join('، ')
+                            ? weakAxes.slice(0, 3).map(a => `${a.nameAr} (${a.wVal} مقابل ${a.nVal})`).join('، ')
                             : `${tightest.nameAr} (${tightest.wVal}/100)`}
                         </>
                       ) : (
@@ -1361,7 +1536,7 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
                           ·{' '}
                           <b className="text-amber-300">{weakAxes.length > 0 ? 'Lagging Nat. Avg:' : 'Tightest Axis:'}</b>{' '}
                           {weakAxes.length > 0
-                            ? weakAxes.map(a => `${a.nameEn} (${a.wVal} vs ${a.nVal})`).join(', ')
+                            ? weakAxes.slice(0, 3).map(a => `${a.nameEn} (${a.wVal} vs ${a.nVal})`).join(', ')
                             : `${tightest.nameEn} (${tightest.wVal}/100)`}
                         </>
                       )}
@@ -1382,8 +1557,8 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
               {detectAnomaly(selectedWilaya)
                 ? `⚠️ ${detectAnomaly(selectedWilaya)}`
                 : isAr
-                ? `${selectedWilaya.n}: تربة ${selectedWilaya.soil}/100 وNDVI ${selectedWilaya.ndvi} مع ${selectedWilaya.dams} سدود و${selectedWilaya.wells} بئراً (عجز ${selectedWilaya.waterDef})؛ التغطية ${selectedWilaya.coverage}%.`
-                : `${selectedWilaya.en}: Soil ${selectedWilaya.soil}/100, NDVI ${selectedWilaya.ndvi}, ${selectedWilaya.dams} dams & ${selectedWilaya.wells} wells (water ${selectedWilaya.waterDef}); ${selectedWilaya.coverage}% market coverage.`}
+                ? `${selectedWilaya.n}: عجز مائي ${selectedWilaya.waterDef}، التغطية الصحية ${getHealthCoverage(selectedWilaya)}% (${getHospitalsCount(selectedWilaya)} مستشفى)، الأخطار ${getHazardIndex(selectedWilaya)}/100، النقل ${getTransportScore(selectedWilaya)}/100، والسياحة ${getTourismScore(selectedWilaya)}/100.`
+                : `${selectedWilaya.en}: Water ${selectedWilaya.waterDef}, Health ${getHealthCoverage(selectedWilaya)}% (${getHospitalsCount(selectedWilaya)} hosp.), Hazards ${getHazardIndex(selectedWilaya)}/100, Transport ${getTransportScore(selectedWilaya)}/100, Tourism ${getTourismScore(selectedWilaya)}/100.`}
             </p>
           </div>
 
@@ -1443,6 +1618,56 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
               <span>🛒</span>
               <span>{isAr ? 'اقتراح سوق جملة وتوزيع' : 'Propose new market depot'}</span>
             </button>
+
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                onClick={() => {
+                  setActionAlert(isAr
+                    ? `تم اقتراح توسعة استشفائية وعيادات جوارية في ${selectedWilaya.n} لرفع التغطية الصحية (${getHealthCoverage(selectedWilaya)}%) 🏥`
+                    : `Hospital & polyclinic boost proposed in ${selectedWilaya.en} (${getHealthCoverage(selectedWilaya)}% cov.) 🏥`);
+                }}
+                className="text-start bg-[#142345] hover:bg-[#1B2F5C] text-slate-200 border border-white/10 text-[11px] px-2.5 py-2 rounded-lg font-semibold transition cursor-pointer flex items-center gap-1.5"
+              >
+                <span>🏥</span>
+                <span className="truncate">{isAr ? 'تعزيز صحي' : 'Health Boost'}</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActionAlert(isAr
+                    ? `تفعيل خطة الوقاية من الأخطار الطبيعية (RPA + مصدات الحرائق) في ${selectedWilaya.n} (مؤشر ${getHazardIndex(selectedWilaya)}/100) 🌋`
+                    : `Hazard mitigation zoning (RPA & firebreaks) activated in ${selectedWilaya.en} (${getHazardIndex(selectedWilaya)}/100) 🌋`);
+                }}
+                className="text-start bg-[#142345] hover:bg-[#1B2F5C] text-slate-200 border border-white/10 text-[11px] px-2.5 py-2 rounded-lg font-semibold transition cursor-pointer flex items-center gap-1.5"
+              >
+                <span>🌋</span>
+                <span className="truncate">{isAr ? 'تخفيف الأخطار' : 'Hazard Shield'}</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActionAlert(isAr
+                    ? `اقتراح ربط لوجستي ومحطة نقل متعددة الوسائط في ${selectedWilaya.n} (مؤشر النقل ${getTransportScore(selectedWilaya)}/100) 🚆`
+                    : `Rail & multimodal freight hub proposed in ${selectedWilaya.en} (${getTransportScore(selectedWilaya)}/100) 🚆`);
+                }}
+                className="text-start bg-[#142345] hover:bg-[#1B2F5C] text-slate-200 border border-white/10 text-[11px] px-2.5 py-2 rounded-lg font-semibold transition cursor-pointer flex items-center gap-1.5"
+              >
+                <span>🚆</span>
+                <span className="truncate">{isAr ? 'محور نقل/سكة' : 'Rail Corridor'}</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActionAlert(isAr
+                    ? `تفعيل منطقة توسع سياحي ZET وتثمين المعالم التراثية في ${selectedWilaya.n} (${getHeritageSitesCount(selectedWilaya)} معلماً) 🏖️`
+                    : `ZET hospitality & heritage circuit activated in ${selectedWilaya.en} (${getHeritageSitesCount(selectedWilaya)} sites) 🏖️`);
+                }}
+                className="text-start bg-[#142345] hover:bg-[#1B2F5C] text-slate-200 border border-white/10 text-[11px] px-2.5 py-2 rounded-lg font-semibold transition cursor-pointer flex items-center gap-1.5"
+              >
+                <span>🏖️</span>
+                <span className="truncate">{isAr ? 'توسع سياحي ZET' : 'Tourism ZET'}</span>
+              </button>
+            </div>
           </div>
 
           {/* Action Notification Toast */}
