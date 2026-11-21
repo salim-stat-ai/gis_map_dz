@@ -84,6 +84,94 @@
   }
 }
 
+/* Active Selected Wilaya Blinking Beacon (Clignotement) */
+@keyframes wilayaBeaconPulse {
+  0% {
+    transform: scale(0.38);
+    opacity: 0.95;
+  }
+  70% {
+    transform: scale(1.18);
+    opacity: 0.25;
+  }
+  100% {
+    transform: scale(1.38);
+    opacity: 0;
+  }
+}
+
+@keyframes wilayaBeaconBlink {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 14px rgba(56, 189, 248, 0.95), 0 0 26px rgba(250, 204, 21, 0.65);
+  }
+  50% {
+    opacity: 0.22;
+    transform: scale(0.86);
+    box-shadow: 0 0 4px rgba(56, 189, 248, 0.25);
+  }
+}
+
+@keyframes wilayaMarkerFlash {
+  0%, 100% {
+    stroke-opacity: 1;
+    fill-opacity: 0.95;
+  }
+  50% {
+    stroke-opacity: 0.25;
+    fill-opacity: 0.45;
+  }
+}
+
+.wilaya-beacon-wrapper {
+  background: transparent !important;
+  border: none !important;
+  pointer-events: none !important;
+}
+
+.wilaya-beacon-root {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.wilaya-beacon-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 2.5px solid #38BDF8;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.75);
+  animation: wilayaBeaconPulse 1.5s cubic-bezier(0.2, 0.7, 0.4, 1) infinite;
+}
+
+.wilaya-beacon-ring-delay {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 2px solid #FACC15;
+  box-shadow: 0 0 12px rgba(250, 204, 21, 0.65);
+  animation: wilayaBeaconPulse 1.5s cubic-bezier(0.2, 0.7, 0.4, 1) infinite 0.75s;
+}
+
+.wilaya-beacon-core {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  border-radius: 9999px;
+  border: 2.5px solid #FFFFFF;
+  animation: wilayaBeaconBlink 0.95s ease-in-out infinite;
+}
+
+path.wilaya-selected-blink {
+  animation: wilayaMarkerFlash 0.95s ease-in-out infinite;
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.85));
+}
+
 /* Scrollbar customization */
 ::-webkit-scrollbar {
   width: 6px;

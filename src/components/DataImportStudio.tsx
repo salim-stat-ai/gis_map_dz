@@ -417,27 +417,38 @@ export const DataImportStudio: React.FC<DataImportStudioProps> = ({
             onChange={handleSelectPreset}
             className="w-full sm:w-auto sm:max-w-xs bg-[#121F3D] text-slate-200 border border-white/15 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-sky-400"
           >
-            <option value="">🌍 Ready sources…</option>
+            <option value="">🌍 {isAr ? 'مصادر جاهزة (أقمار صناعية وGIS)...' : 'Ready sources…'}</option>
 
-            <optgroup label="Algeria — open geo-data">
-              <option value="gadm-dz">GADM — Algeria provinces (polygons)</option>
-              <option value="osm-dams">OSM — dams & reservoirs, Algeria (Overpass)</option>
-              <option value="osm-hosp">OSM — hospitals, Algiers (Overpass)</option>
-              <option value="osm-rail">OSM — railway stations & SNTF network (Overpass)</option>
-              <option value="osm-tourism">OSM — heritage sites & hotels in Algeria (Overpass)</option>
-              <option value="ons-economy">ONS — National Office of Statistics (Wilaya Indicators)</option>
-              <option value="anrh-water">ANRH — National Water Agency (Dams & Deficit)</option>
-              <option value="worldbank-dz">World Bank — Algeria Indicators API</option>
-              <option value="nasa-power">NASA POWER — Climatology (Rain & Solar)</option>
+            <optgroup label={isAr ? '🛰️ الأقمار الصناعية ورصد الأرض (Sentinel-2, Landsat, NASA)' : '🛰️ Satellite & Earth Observation (Sentinel-2, Landsat, NASA)'}>
+              {IMPORT_PRESETS.filter(p => p.group === 'satellite').map(p => (
+                <option key={p.id} value={p.id}>
+                  {isAr ? p.nameAr : p.name}
+                </option>
+              ))}
             </optgroup>
 
-            <optgroup label="Built-in samples (always work)">
-              <option value="sample-csv">Sample — wilaya indicators (CSV)</option>
-              <option value="sample-dams">Sample — dams (GeoJSON)</option>
+            <optgroup label={isAr ? '🇩🇿 الجزائر — بيانات مكانية وإحصائية مفتوحة' : 'Algeria — open geo-data'}>
+              {IMPORT_PRESETS.filter(p => p.group === 'algeria').map(p => (
+                <option key={p.id} value={p.id}>
+                  {isAr ? p.nameAr : p.name}
+                </option>
+              ))}
             </optgroup>
 
-            <optgroup label="World">
-              <option value="world">World countries (GeoJSON)</option>
+            <optgroup label={isAr ? '📦 عينات جاهزة (تعمل فوراً)' : 'Built-in samples (always work)'}>
+              {IMPORT_PRESETS.filter(p => p.group === 'samples').map(p => (
+                <option key={p.id} value={p.id}>
+                  {isAr ? p.nameAr : p.name}
+                </option>
+              ))}
+            </optgroup>
+
+            <optgroup label={isAr ? '🌐 العالم' : 'World'}>
+              {IMPORT_PRESETS.filter(p => p.group === 'world').map(p => (
+                <option key={p.id} value={p.id}>
+                  {isAr ? p.nameAr : p.name}
+                </option>
+              ))}
             </optgroup>
           </select>
 
@@ -446,7 +457,7 @@ export const DataImportStudio: React.FC<DataImportStudioProps> = ({
             type="url"
             value={importUrl}
             onChange={e => setImportUrl(e.target.value)}
-            placeholder="https://…/data.csv (CSV, JSON, GeoJSON, KML)"
+            placeholder="https://…/data.csv (CSV, JSON, GeoJSON, STAC, KML)"
             className="w-full sm:flex-1 sm:min-w-[220px] bg-[#0A1224] text-slate-200 placeholder-slate-500 border border-white/15 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-sky-400"
           />
 
@@ -481,6 +492,23 @@ export const DataImportStudio: React.FC<DataImportStudioProps> = ({
             <span>via proxy</span>
           </label>
         </div>
+
+        {selectedPreset && (() => {
+          const activeP = IMPORT_PRESETS.find(p => p.id === selectedPreset);
+          if (!activeP) return null;
+          return (
+            <div className="bg-[#0B162C] border border-sky-500/25 rounded-xl px-3.5 py-2 text-[11px] text-slate-300 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <span className="text-sky-300 font-bold">{activeP.group === 'satellite' ? '🛰️ ' : '📡 '}</span>
+                <span className="font-semibold text-white">{isAr ? activeP.nameAr : activeP.name}: </span>
+                <span className="text-slate-300">{activeP.description}</span>
+              </div>
+              <span className="text-[10px] text-amber-300 font-semibold">
+                {isAr ? 'اضغط "جلب من الرابط" لتحميل المشاهد/البيانات الآن' : 'Click "Fetch URL" to load live scenes/records'}
+              </span>
+            </div>
+          );
+        })()}
 
         {/* Row 3: Export dataset buttons */}
         <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-white/5">

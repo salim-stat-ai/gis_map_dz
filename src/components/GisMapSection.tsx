@@ -37,7 +37,7 @@ import { Info, MapPin, Layers, Droplets, ShieldAlert, TrendingUp, Compass, Check
 
 ChartJS.register(...registerables);
 
-export type BasemapKey = 'osm' | 'satellite' | 'dark' | 'topo';
+export type BasemapKey = 'osm' | 'satellite' | 's2cloudless' | 'modis_true' | 'modis_ndvi' | 'dark' | 'topo';
 
 export interface BasemapOption {
   key: BasemapKey;
@@ -55,21 +55,51 @@ export const BASEMAP_OPTIONS: BasemapOption[] = [
     key: 'osm',
     labelAr: 'خريطة الشارع المفتوح (التطبيق القديم - مجاني)',
     labelEn: 'OpenStreetMap (Legacy App - Free)',
-    shortLabelAr: 'خريطة التطبيق القديم (OSM)',
+    shortLabelAr: 'خريطة الشارع (OSM)',
     shortLabelEn: 'Legacy OSM',
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     attribution: '&copy; OpenStreetMap contributors',
     maxZoom: 19
   },
   {
+    key: 's2cloudless',
+    labelAr: '🛰️ سينتينل-2 بدون سحب (ESA Copernicus / EOX)',
+    labelEn: '🛰️ Sentinel-2 Cloudless (ESA Copernicus)',
+    shortLabelAr: '🛰️ Sentinel-2',
+    shortLabelEn: '🛰️ Sentinel-2',
+    url: 'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2021_3857/default/g/{z}/{y}/{x}.jpg',
+    attribution: 'Sentinel-2 cloudless by EOX (Copernicus data)',
+    maxZoom: 15
+  },
+  {
     key: 'satellite',
-    labelAr: 'صور الأقمار الاصطناعية (Esri Satellite)',
-    labelEn: 'Satellite Imagery (Esri)',
-    shortLabelAr: 'أقمار اصطناعية',
-    shortLabelEn: 'Satellite',
+    labelAr: '🛰️ صور الأقمار عالية الدقة (Esri Satellite)',
+    labelEn: '🛰️ High-Res Satellite (Esri)',
+    shortLabelAr: 'أقمار عالية الدقة',
+    shortLabelEn: 'Esri Satellite',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     attribution: '&copy; Esri, Maxar, Earthstar Geographics',
     maxZoom: 18
+  },
+  {
+    key: 'modis_true',
+    labelAr: '🛰️ ناسا MODIS ألوان حقيقية (NASA GIBS)',
+    labelEn: '🛰️ NASA MODIS Terra True Color',
+    shortLabelAr: '🛰️ NASA MODIS',
+    shortLabelEn: '🛰️ NASA MODIS',
+    url: 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/2025-06-15/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg',
+    attribution: 'NASA EOSDIS GIBS (MODIS Terra)',
+    maxZoom: 9
+  },
+  {
+    key: 'modis_ndvi',
+    labelAr: '🌿 ناسا MODIS الغطاء النباتي NDVI الفضائي',
+    labelEn: '🌿 NASA MODIS 8-Day Vegetation NDVI',
+    shortLabelAr: '🌿 MODIS NDVI',
+    shortLabelEn: '🌿 MODIS NDVI',
+    url: 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_NDVI_8Day/default/2025-06-10/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png',
+    attribution: 'NASA EOSDIS GIBS (MODIS NDVI)',
+    maxZoom: 9
   },
   {
     key: 'dark',
@@ -307,16 +337,45 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
 
     // 1. Transport Layer Overlay: National Rail & Highway Corridors
     if (activeLayers.transport || currentSector === 'transport') {
-      const corridors: { nums: number[]; dashed?: string; color: string }[] = [
-        // East-West Highway & Northern Trunk Rail (Tlemcen - Oran - Chlef - Algiers - Setif - Constantine - Annaba)
-        { nums: [13, 22, 31, 48, 2, 44, 9, 16, 35, 10, 34, 19, 43, 25, 21, 23, 36], color: '#38BDF8' },
-        // Eastern Mining & Highlands Rail (Constantine - Batna - Biskra - Touggourt - Ouargla & Tebessa)
-        { nums: [25, 5, 7, 57, 55, 30], color: '#22D3EE', dashed: '5,5' },
-        { nums: [25, 24, 41, 12], color: '#22D3EE', dashed: '5,5' },
-        // High Plateaus & Central Trans-Saharan Axis (Algiers - Medea - Djelfa - Laghouat - Ghardaia - El Meniaa - In Salah - Tamanrasset)
-        { nums: [16, 26, 17, 3, 47, 58, 53, 11], color: '#0EA5E9', dashed: '6,5' },
-        // Western Mining & Desert Axis (Oran - Mascara - Saida - Naama - Bechar - Beni Abbes - Tindouf)
-        { nums: [31, 29, 20, 45, 8, 52, 37], color: '#38BDF8', dashed: '6,5' }
+      const corridors: { nums: number[]; dashed?: string; color: string; nameAr: string; nameEn: string }[] = [
+        // East-West Highway & Northern Trunk Rail
+        {
+          nums: [13, 22, 31, 48, 2, 44, 9, 16, 35, 10, 34, 19, 43, 25, 21, 23, 36],
+          color: '#38BDF8',
+          nameAr: '🚆 المحور الشمالي الرئيسي (الطريق السيار شرق–غرب والسكة الحديدية الشمالية)',
+          nameEn: '🚆 Northern Trunk Rail & East–West Highway Corridor'
+        },
+        // Eastern Mining & Highlands Rail
+        {
+          nums: [25, 5, 7, 57, 55, 30],
+          color: '#22D3EE',
+          dashed: '5,5',
+          nameAr: '🚆 محور السكة الشرقية والواحات (قسنطينة–باتنة–بسكرة–المغير–تقرت–ورقلة)',
+          nameEn: '🚆 Eastern Highlands & Oued Righ Rail Corridor (Constantine–Biskra–Ouargla)'
+        },
+        {
+          nums: [25, 24, 41, 12],
+          color: '#22D3EE',
+          dashed: '5,5',
+          nameAr: '🚆 الخط المنجمي الشرقي (قسنطينة–قالمة–سوق أهراس–تبسة)',
+          nameEn: '🚆 Eastern Mining Rail Corridor (Constantine–Souk Ahras–Tébessa)'
+        },
+        // High Plateaus & Central Trans-Saharan Axis
+        {
+          nums: [16, 26, 17, 3, 47, 58, 53, 11],
+          color: '#0EA5E9',
+          dashed: '6,5',
+          nameAr: '🚆 المحور العابر للصحراء الوسطى (الجزائر–الجلفة–الأغواط–غرداية–المنيعة–عين صالح–تمنراست)',
+          nameEn: '🚆 Central Trans-Saharan Rail & Highway Axis (Algiers–Djelfa–Ghardaïa–Tamanrasset)'
+        },
+        // Western Mining & Desert Axis
+        {
+          nums: [31, 29, 20, 45, 8, 52, 37],
+          color: '#38BDF8',
+          dashed: '6,5',
+          nameAr: '🚆 المحور المنجمي الغربي (وهران–سعيدة–النعامة–بشار–بني عباس–تندوف / غارا جبيلات)',
+          nameEn: '🚆 Western Mining & Saoura Rail Axis (Oran–Saïda–Béchar–Béni Abbès–Tindouf)'
+        }
       ];
       corridors.forEach(corr => {
         const pts: [number, number][] = [];
@@ -325,13 +384,14 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
           if (rec) pts.push([rec.lat, rec.lon]);
         });
         if (pts.length >= 2) {
-          L.polyline(pts, {
+          const line = L.polyline(pts, {
             color: corr.color,
-            weight: currentSector === 'transport' ? 3 : 1.8,
-            opacity: currentSector === 'transport' ? 0.78 : 0.42,
+            weight: currentSector === 'transport' ? 3 : 2,
+            opacity: currentSector === 'transport' ? 0.82 : 0.48,
             dashArray: corr.dashed,
-            interactive: false
+            interactive: true
           }).addTo(overlayGroup);
+          line.bindTooltip(isAr ? corr.nameAr : corr.nameEn, { sticky: true });
         }
       });
     }
@@ -399,14 +459,37 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
       const c = getColorBySector(w, currentSector);
       const r = getSizeBySector(w, currentSector);
       const anom = detectAnomaly(w);
+      const isSelected = selectedWilaya.num === w.num;
 
       const marker = L.circleMarker([w.lat, w.lon], {
-        radius: r,
-        color: c,
+        radius: isSelected ? Math.max(r + 2, 11) : r,
+        color: isSelected ? '#FFFFFF' : c,
         fillColor: c,
-        fillOpacity: 0.65,
-        weight: selectedWilaya.num === w.num ? 4 : 2
+        fillOpacity: isSelected ? 0.95 : 0.65,
+        weight: isSelected ? 4 : 2,
+        className: isSelected ? 'wilaya-selected-blink' : undefined
       }).addTo(map);
+
+      if (isSelected) {
+        marker.bringToFront();
+        const beaconSize = Math.max(66, (r + 18) * 2);
+        const coreSize = Math.max(28, (r + 5) * 2);
+        const beaconIcon = L.divIcon({
+          className: 'wilaya-beacon-wrapper',
+          iconSize: [beaconSize, beaconSize],
+          iconAnchor: [beaconSize / 2, beaconSize / 2],
+          html: `<div class="wilaya-beacon-root" style="width:${beaconSize}px;height:${beaconSize}px;">
+            <span class="wilaya-beacon-ring"></span>
+            <span class="wilaya-beacon-ring-delay"></span>
+            <span class="wilaya-beacon-core" style="width:${coreSize}px;height:${coreSize}px;"></span>
+          </div>`
+        });
+        L.marker([w.lat, w.lon], {
+          icon: beaconIcon,
+          interactive: false,
+          zIndexOffset: 950
+        }).addTo(overlayGroup);
+      }
 
       const geo = classifyWilayaGeoZone(w);
       const pw = predictWater(w, targetYear);
@@ -1072,6 +1155,37 @@ export const GisMapSection: React.FC<GisMapSectionProps> = ({
             <p className="text-[10px] text-slate-500 mt-1">
               {isAr ? 'حجم الدائرة يتناسب مع كثافة المؤشر' : 'Circle radius reflects indicator intensity'}
             </p>
+
+            <div className="pt-2 border-t border-white/10 space-y-1.5 text-[10.5px] text-slate-300">
+              <div className="font-bold text-slate-200">{isAr ? 'دليل الخطوط والحلقات:' : 'Lines & Halos Legend:'}</div>
+              <div className="flex items-center gap-2">
+                <span className="w-6 border-t-2 border-sky-400 shrink-0 inline-block" />
+                <span>{isAr ? 'محور النقل والسكك الشمالي (متصل)' : 'Northern Rail & Highway Trunk'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-6 border-t-2 border-dashed border-cyan-400 shrink-0 inline-block" />
+                <span>{isAr ? 'محاور السكك والربط الصحراوي/الهضاب (متقطع)' : 'Saharan & Highlands Rail/Logistic Axes'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3.5 h-3.5 rounded-full border-2 border-dashed border-orange-400 shrink-0 inline-block" />
+                <span>{isAr ? 'هالة متقطعة: أخطار طبيعية مرتفعة' : 'Dashed ring: High natural hazards'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3.5 h-3.5 rounded-full border-2 border-teal-400 shrink-0 inline-block" />
+                <span>{isAr ? 'هالة خضراء/وردية: قطب أو فجوة صحية' : 'Teal/Rose ring: Health hub / gap'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white border border-sky-400" />
+                </span>
+                <span className="text-sky-300 font-semibold">{isAr ? 'هالة وامضة: الولاية المعنية المختارة' : 'Blinking beacon: Active selected wilaya'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3.5 h-3.5 rounded-full border-2 border-dashed border-amber-400 shrink-0 inline-block" />
+                <span>{isAr ? 'هالة ذهبية: قطب سياحي وتراثي (MTA)' : 'Gold ring: Tourism & Heritage pole'}</span>
+              </div>
+            </div>
           </div>
         </div>
 

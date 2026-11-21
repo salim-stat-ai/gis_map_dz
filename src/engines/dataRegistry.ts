@@ -128,6 +128,42 @@ export const ALGERIA_DATA_SOURCES: DataSourceMeta[] = [
     lastUpdated: '2026-03-10',
     type: 'Real Statistics',
     status: 'Curated'
+  },
+  {
+    id: 'sentinel1-dz',
+    name: 'Copernicus Sentinel-1 SAR Radar (GRD)',
+    nameAr: 'أقمار سينتينل-1 الرادارية (الفيضانات ورطوبة التربة)',
+    organization: 'European Space Agency (ESA) / Copernicus',
+    frequency: '6–12 Day C-Band SAR Orbit',
+    coverage: 'All-weather flood extent, soil moisture & subsidence over Algeria',
+    lastUpdated: '2026-03-12',
+    type: 'Satellite Feeds',
+    apiUrl: 'https://earth-search.aws.element84.com/v1/collections/sentinel-1-grd',
+    status: 'Operational'
+  },
+  {
+    id: 'landsat-dz',
+    name: 'USGS / NASA Landsat 8 & 9 (Collection-2 L2)',
+    nameAr: 'أقمار لاندسات 8 و9 (الحراري والغطاء الأرضي)',
+    organization: 'USGS & NASA Earth Science',
+    frequency: '8-Day Combined Thermal & Optical Revisit',
+    coverage: '30m optical + 100m thermal surface temperature across 58 wilayas',
+    lastUpdated: '2026-03-12',
+    type: 'Satellite Feeds',
+    apiUrl: 'https://earth-search.aws.element84.com/v1/collections/landsat-c2-l2',
+    status: 'Operational'
+  },
+  {
+    id: 'copernicus-dem-dz',
+    name: 'Copernicus DEM GLO-30 & NASA MODIS NDVI',
+    nameAr: 'نموذج الارتفاعات الرقمي (Copernicus 30m) ومؤشر MODIS NDVI',
+    organization: 'ESA Copernicus & NASA EOSDIS GIBS',
+    frequency: '30m Global DEM + 8-Day Vegetation Composite',
+    coverage: 'Watershed slopes, Atlas relief & national vegetation vigor',
+    lastUpdated: '2026-03-10',
+    type: 'Satellite Feeds',
+    apiUrl: 'https://gibs.earthdata.nasa.gov',
+    status: 'Operational'
   }
 ];
 

@@ -66,14 +66,79 @@ export interface PresetSource {
   id: string;
   name: string;
   nameAr: string;
-  group: 'algeria' | 'samples' | 'world';
+  group: 'algeria' | 'satellite' | 'samples' | 'world';
   url: string;
   formatHint?: string;
   description: string;
 }
 
 export const IMPORT_PRESETS: PresetSource[] = [
-  // 1. Algeria — open geo-data
+  // 1. Satellite & Earth Observation (Sentinel-2, Sentinel-1, Landsat, DEM, NASA, USGS)
+  {
+    id: 'sentinel2-dz',
+    name: 'Sentinel-2 L2A (Copernicus/ESA) — Algeria Multispectral Scenes (STAC)',
+    nameAr: 'سينتينل-2 (Sentinel-2 L2A) — مشاهد طيفية وNDVI للجزائر',
+    group: 'satellite',
+    url: 'https://earth-search.aws.element84.com/v1/collections/sentinel-2-l2a/items?bbox=-2.5,24.0,10.5,37.1&limit=25',
+    formatHint: 'geojson',
+    description: 'Live Copernicus Sentinel-2 L2A STAC catalog over Algeria (10m RGB/NIR, cloud cover, vegetation & water indices).'
+  },
+  {
+    id: 'sentinel1-dz',
+    name: 'Sentinel-1 GRD (Copernicus SAR Radar) — Algeria Flood & Surface Scenes',
+    nameAr: 'سينتينل-1 الراداري (Sentinel-1 SAR) — رصد الفيضانات والتربة',
+    group: 'satellite',
+    url: 'https://earth-search.aws.element84.com/v1/collections/sentinel-1-grd/items?bbox=-2.5,24.0,10.5,37.1&limit=25',
+    formatHint: 'geojson',
+    description: 'All-weather C-band Synthetic Aperture Radar (SAR) acquisitions over Algerian basins.'
+  },
+  {
+    id: 'landsat-dz',
+    name: 'Landsat 8/9 C2-L2 (USGS/NASA) — Algeria Optical & Thermal Scenes',
+    nameAr: 'لاندسات 8 و9 (Landsat C2-L2) — التصوير الحراري والأرضي للجزائر',
+    group: 'satellite',
+    url: 'https://earth-search.aws.element84.com/v1/collections/landsat-c2-l2/items?bbox=-2.5,24.0,10.5,37.1&limit=25',
+    formatHint: 'geojson',
+    description: 'USGS/NASA Landsat Collection 2 Level-2 surface reflectance & land surface temperature scenes.'
+  },
+  {
+    id: 'copdem-dz',
+    name: 'Copernicus DEM GLO-30 — Algeria 30m Elevation Tiles (STAC)',
+    nameAr: 'نموذج الارتفاعات الرقمي (Copernicus DEM 30m) — تضاريس الجزائر',
+    group: 'satellite',
+    url: 'https://earth-search.aws.element84.com/v1/collections/cop-dem-glo-30/items?bbox=-2.5,24.0,10.5,37.1&limit=25',
+    formatHint: 'geojson',
+    description: '30-meter Digital Elevation Model tiles covering Tell Atlas, High-Plateaus, and Saharan massifs.'
+  },
+  {
+    id: 'nasa-eonet',
+    name: 'NASA EONET — Live Satellite Wildfires, Dust Storms & Floods',
+    nameAr: 'ناسا EONET — رصد الحرائق والعواصف والفيضانات الفضائي المباشر',
+    group: 'satellite',
+    url: 'https://eonet.gsfc.nasa.gov/api/v3/events?limit=25&status=open',
+    formatHint: 'json',
+    description: 'Near real-time Earth Observatory Natural Event Tracker fed by MODIS & VIIRS satellites.'
+  },
+  {
+    id: 'usgs-seismic-dz',
+    name: 'USGS Seismic Catalog — Algeria & Mediterranean Earthquakes (GeoJSON)',
+    nameAr: 'USGS — رصد الزلازل بالجزائر والحوض المتوسطي (GeoJSON)',
+    group: 'satellite',
+    url: 'https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minlatitude=19&maxlatitude=38&minlongitude=-9&maxlongitude=12&limit=30',
+    formatHint: 'geojson',
+    description: 'Live USGS GeoJSON seismic events across northern Algeria and Tell Atlas fault lines.'
+  },
+  {
+    id: 'nasa-power-sahara',
+    name: 'NASA POWER — Southern Algeria / Tamanrasset Solar & Arid Climate',
+    nameAr: 'ناسا باور — الإشعاع الشمسي والمناخ بالجنوب الجزائري (تمنراست)',
+    group: 'satellite',
+    url: 'https://power.larc.nasa.gov/api/temporal/climatology/point?parameters=PRECTOTCORR,ALLSKY_SFC_SW_DWN&community=AG&longitude=5.52&latitude=22.78&format=JSON',
+    formatHint: 'json',
+    description: 'Satellite solar irradiance & precipitation climatology for deep Saharan solar planning.'
+  },
+
+  // 2. Algeria — open geo-data
   {
     id: 'gadm-dz',
     name: 'GADM — Algeria provinces (polygons)',
@@ -148,23 +213,23 @@ export const IMPORT_PRESETS: PresetSource[] = [
   },
   {
     id: 'nasa-power',
-    name: 'NASA POWER — Climatology (Rainfall & Solar)',
-    nameAr: 'ناسا باور — المناخ والأمطار والإشعاع الشمسي',
+    name: 'NASA POWER — Northern Algeria Climatology (Rainfall & Solar)',
+    nameAr: 'ناسا باور — المناخ والأمطار والإشعاع الشمسي (الشمال)',
     group: 'algeria',
     url: 'https://power.larc.nasa.gov/api/temporal/climatology/point?parameters=PRECTOTCORR,ALLSKY_SFC_SW_DWN&community=AG&longitude=3.05&latitude=36.75&format=JSON',
     formatHint: 'json',
     description: 'Satellite meteorological data measuring surface precipitation and solar irradiation.'
   },
 
-  // 2. Built-in samples (always work)
+  // 3. Built-in samples (always work)
   {
     id: 'sample-csv',
     name: 'Sample — wilaya indicators (CSV)',
-    nameAr: 'عينة جاهزة — مؤشرات الولايات الـ 18 (CSV)',
+    nameAr: 'عينة جاهزة — مؤشرات الولايات (CSV)',
     group: 'samples',
     url: '/samples/wilaya_indicators.csv',
     formatHint: 'csv',
-    description: 'Verified sample CSV with all 18 indicators populated for reference wilayas.'
+    description: 'Verified sample CSV with all indicators populated for reference wilayas.'
   },
   {
     id: 'sample-dams',
@@ -176,7 +241,7 @@ export const IMPORT_PRESETS: PresetSource[] = [
     description: 'Spatial GeoJSON points marking major Algerian dams (Beni Haroun, Koudiat Acerdoune, etc.).'
   },
 
-  // 3. World
+  // 4. World
   {
     id: 'world',
     name: 'World countries (GeoJSON)',
@@ -420,6 +485,59 @@ export function parseNasaPower(j: any): any[] {
   return rows;
 }
 
+export function parseSTAC(gj: any): any[] {
+  const feats = gj.features || [];
+  return feats.map((f: any) => {
+    const p = f.properties || {};
+    let lat: number | undefined;
+    let lon: number | undefined;
+    if (Array.isArray(f.bbox) && f.bbox.length >= 4) {
+      lon = Math.round(((f.bbox[0] + f.bbox[2]) / 2) * 10000) / 10000;
+      lat = Math.round(((f.bbox[1] + f.bbox[3]) / 2) * 10000) / 10000;
+    } else if (f.geometry?.coordinates) {
+      const bb = computeBbox(f.geometry.coordinates);
+      if (bb) {
+        lon = Math.round(((bb[0] + bb[2]) / 2) * 10000) / 10000;
+        lat = Math.round(((bb[1] + bb[3]) / 2) * 10000) / 10000;
+      }
+    }
+    const vegPct = p['s2:vegetation_percentage'];
+    const row: Record<string, any> = {
+      name: f.id || p.title || p['grid:code'] || 'STAC Scene',
+      lat,
+      lon,
+      platform: p.platform || p.constellation || f.collection || 'satellite',
+      datetime: typeof p.datetime === 'string' ? p.datetime.slice(0, 19).replace('T', ' ') : '',
+      cloud_cover_pct: p['eo:cloud_cover'] !== undefined ? Math.round(Number(p['eo:cloud_cover']) * 10) / 10 : '',
+      ndvi: vegPct !== undefined ? Math.round((Number(vegPct) / 100) * 100) / 100 : '',
+      water_pct: p['s2:water_percentage'] !== undefined ? Math.round(Number(p['s2:water_percentage']) * 10) / 10 : '',
+      tile_grid: p['grid:code'] || (p['landsat:wrs_path'] ? `P${p['landsat:wrs_path']}/R${p['landsat:wrs_row']}` : ''),
+      preview_url: f.assets?.thumbnail?.href || f.assets?.rendered_preview?.href || f.assets?.visual?.href || ''
+    };
+    return row;
+  });
+}
+
+export function parseEONET(j: any): any[] {
+  const events = j.events || [];
+  return events.map((ev: any) => {
+    const g = Array.isArray(ev.geometry) ? ev.geometry[ev.geometry.length - 1] : ev.geometry;
+    const coords = Array.isArray(g?.coordinates) ? g.coordinates : [];
+    const lon = typeof coords[0] === 'number' ? coords[0] : undefined;
+    const lat = typeof coords[1] === 'number' ? coords[1] : undefined;
+    return {
+      name: ev.title || ev.id,
+      category: ev.categories?.[0]?.title || 'Natural Event',
+      date: typeof g?.date === 'string' ? g.date.slice(0, 19).replace('T', ' ') : '',
+      lat,
+      lon,
+      magnitude: g?.magnitudeValue ?? '',
+      unit: g?.magnitudeUnit ?? '',
+      source: ev.sources?.[0]?.id || 'NASA EONET'
+    };
+  });
+}
+
 export async function parseFileBytes(buf: ArrayBuffer, ext: string, label: string): Promise<any[]> {
   const cleanExt = ext.toLowerCase();
 
@@ -438,8 +556,10 @@ export async function parseFileBytes(buf: ArrayBuffer, ext: string, label: strin
     const text = new TextDecoder('utf-8').decode(buf);
     const parsed = JSON.parse(text);
     if (parsed.elements) return parseOSM(parsed);
+    if (Array.isArray(parsed.events)) return parseEONET(parsed);
     if (Array.isArray(parsed) && parsed.length >= 2 && Array.isArray(parsed[1])) return parseWorldBank(parsed);
     if (parsed.properties?.parameter) return parseNasaPower(parsed);
+    if (parsed.stac_version || (Array.isArray(parsed.features) && parsed.features[0]?.stac_version)) return parseSTAC(parsed);
     if (parsed.type === 'FeatureCollection' || parsed.features || parsed.type === 'Feature') return parseGeoJSON(parsed);
     return Array.isArray(parsed) ? parsed : [parsed];
   }
